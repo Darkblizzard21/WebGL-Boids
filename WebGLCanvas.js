@@ -1,12 +1,14 @@
 import React, {useRef, useEffect} from "react";
 import WebGLUtil from "./utils/WebGL";
-
+import "./WEbGLCanvas.scss";
 import {
   drawParticlesFS,
   drawParticlesVS,
   emptyFS,
-  updatePositionVS, updateVelocityVS
+  updatePositionVS,
+  updateVelocityVS
 } from "./shader/shaderVar";
+
 
 const webGL = new WebGLUtil();
 
@@ -28,8 +30,13 @@ export default function Triangle() {
     const updateVelocityPrgLocs = {
       position: gl.getAttribLocation(updateVelocityProgram, "position"),
       oldVelocity: gl.getAttribLocation(updateVelocityProgram, "oldVelocity"),
+      maxSpeed: gl.getAttribLocation(updateVelocityProgram, "maxSpeed"),
+      minSpeed: gl.getUniformLocation(drawParticlesProgram, "minSpeed"),
+      size: gl.getUniformLocation(drawParticlesProgram, "size"),
       deltaTime: gl.getUniformLocation(updateVelocityProgram, "deltaTime"),
-      allOldPositions: gl.getUniformLocation(updateVelocityProgram, "allOldPositions")
+      canvasDimensions: gl.getUniformLocation(updateVelocityProgram, "canvasDimensions"),
+      allOldPositions: gl.getUniformLocation(updateVelocityProgram, "allOldPositions"),
+      allOldVelocities: gl.getUniformLocation(updateVelocityProgram, "allOldVelocities")
     };
 
     const updatePositionPrgLocs = {
@@ -41,7 +48,8 @@ export default function Triangle() {
 
     const drawParticlesProgLocs = {
       position: gl.getAttribLocation(drawParticlesProgram, "position"),
-      matrix: gl.getUniformLocation(drawParticlesProgram, "matrix")
+      matrix: gl.getUniformLocation(drawParticlesProgram, "matrix"),
+      size: gl.getUniformLocation(drawParticlesProgram, "size")
     };
 
 
@@ -53,27 +61,32 @@ export default function Triangle() {
       }
       return Math.random() * (max - min) + min;
     };
+    const size = 7.0;
     const numParticles = 200;
+    const minSpeed = 250;
+    const maxSpeed = 300;
     const createPoints = (num, ranges) =>
       new Array(num).fill(0).map(_ => ranges.map(range => rand(...range))).flat();
     const positions = new Float32Array(createPoints(numParticles, [[canvas.current.width], [canvas.current.height]]));
-    const velocities = new Float32Array(createPoints(numParticles, [[-300, 300], [-300, 300]]));
-
+    const velocities = new Float32Array(createPoints(numParticles, [[-maxSpeed,maxSpeed], [-maxSpeed, maxSpeed]], true));
+    const maxSpeeds = new Float32Array(Array(numParticles*2).fill(0).map(_ => rand(minSpeed,maxSpeed)));
     // build buffers
     const position1Buffer = webGL.makeBuffer(gl, positions, gl.DYNAMIC_DRAW);
     const position2Buffer = webGL.makeBuffer(gl, positions, gl.DYNAMIC_DRAW);
     const velocity1Buffer = webGL.makeBuffer(gl, velocities, gl.DYNAMIC_DRAW);
     const velocity2Buffer = webGL.makeBuffer(gl, velocities, gl.DYNAMIC_DRAW);
-
+    const speedBuffer = webGL.makeBuffer(gl, maxSpeeds, gl.STATIC_DRAW);
 
     // build vertex arrays
     const updateVelocityVA1 = webGL.makeVertexArray(gl, [
       [position1Buffer, updateVelocityPrgLocs.position],
-      [velocity1Buffer, updateVelocityPrgLocs.oldVelocity]
+      [velocity1Buffer, updateVelocityPrgLocs.oldVelocity],
+      [speedBuffer, updateVelocityPrgLocs.maxSpeed]
     ]);
     const updateVelocityVA2 = webGL.makeVertexArray(gl, [
       [position2Buffer, updateVelocityPrgLocs.position],
-      [velocity2Buffer, updateVelocityPrgLocs.oldVelocity]
+      [velocity2Buffer, updateVelocityPrgLocs.oldVelocity],
+      [speedBuffer, updateVelocityPrgLocs.maxSpeed]
     ]);
 
     const updatePositionVA1 = webGL.makeVertexArray(gl, [
@@ -136,27 +149,24 @@ export default function Triangle() {
 
       webGL.resizeCanvasToDisplaySize(gl.canvas);
 
-
-      gl.clear(gl.DEPTH_BUFFER_BIT);
-      let bufferViewVelo = new Float32Array(numParticles * 2);
-      gl.bindBuffer(gl.ARRAY_BUFFER, velocity1Buffer);
-      gl.getBufferSubData(gl.ARRAY_BUFFER, 0, bufferViewVelo);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-      let bufferViewVel2o = new Float32Array(numParticles * 2);
-      gl.bindBuffer(gl.ARRAY_BUFFER, velocity2Buffer);
-      gl.getBufferSubData(gl.ARRAY_BUFFER, 0, bufferViewVel2o);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
       // compute the new velocities
       gl.useProgram(updateVelocityProgram);
       gl.bindVertexArray(current.updateVelocityVA);
+      gl.uniform1f(updateVelocityPrgLocs.minSpeed, minSpeed);
+      gl.uniform1f(updateVelocityPrgLocs.size, size);
       gl.uniform1f(updateVelocityPrgLocs.deltaTime, deltaTime);
+      gl.uniform2f(updateVelocityPrgLocs.canvasDimensions, gl.canvas.width, gl.canvas.height);
 
-      let bufferView = new Float32Array(numParticles * 2);
+      let positionsView = new Float32Array(numParticles * 2);
       gl.bindBuffer(gl.ARRAY_BUFFER, current.pReadBuffer === position1Buffer ? position1Buffer : position2Buffer);
-      gl.getBufferSubData(gl.ARRAY_BUFFER, 0, bufferView);
+      gl.getBufferSubData(gl.ARRAY_BUFFER, 0, positionsView);
       gl.bindBuffer(gl.ARRAY_BUFFER, null);
-      gl.uniform2fv(updateVelocityPrgLocs.allOldPositions, bufferView);
+      gl.uniform2fv(updateVelocityPrgLocs.allOldPositions, positionsView);
+      let velocitiesView = new Float32Array(numParticles * 2);
+      gl.bindBuffer(gl.ARRAY_BUFFER, current.vReadBuffer === velocity1Buffer ? velocity1Buffer : velocity2Buffer);
+      gl.getBufferSubData(gl.ARRAY_BUFFER, 0, velocitiesView);
+      gl.bindBuffer(gl.ARRAY_BUFFER, null);
+      gl.uniform2fv(updateVelocityPrgLocs.allOldVelocities, velocitiesView);
 
       gl.enable(gl.RASTERIZER_DISCARD);
 
@@ -190,6 +200,7 @@ export default function Triangle() {
         drawParticlesProgLocs.matrix,
         false,
         webGL.m4.orthographic(0, gl.canvas.width, 0, gl.canvas.height, -1, 1));
+      gl.uniform1f(drawParticlesProgLocs.size, size);
       gl.drawArrays(gl.POINTS, 0, numParticles);
 
       // swap which buffer we will read from
@@ -207,6 +218,6 @@ export default function Triangle() {
   }, []);
 
   return (
-    <canvas id="WebGL" style={{width: "100%", height: "100%"}} ref={canvas}>Your browser doesn't appear to support the
+    <canvas id="WebGL" className="web-canvas" ref={canvas}>Your browser doesn't appear to support the
       <code>&lt;canvas&gt;</code> element.</canvas>);
 }
