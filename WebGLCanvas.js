@@ -65,11 +65,14 @@ export default function Triangle() {
     const size = 7.0;
     const margin = size * 2.0;
     const numParticles = 200;
-    const minSpeed = 250;
-    const maxSpeed = 300;
+    const minSpeed = 150;
+    const maxSpeed = 350;
+    const spawnMargin = 0.2;
     const createPoints = (num, ranges) =>
       new Array(num).fill(0).map(_ => ranges.map(range => rand(...range))).flat();
-    const positions = new Float32Array(createPoints(numParticles, [[canvas.current.width], [canvas.current.height]]));
+    const positions = new Float32Array(createPoints(numParticles,
+      [[canvas.current.width * spawnMargin, canvas.current.width * (1 - spawnMargin)],
+        [canvas.current.height * spawnMargin, canvas.current.height * (1 - spawnMargin)]]));
     const velocities = new Float32Array(createPoints(numParticles, [[-maxSpeed, maxSpeed], [-maxSpeed, maxSpeed]], true));
     const maxSpeeds = new Float32Array(Array(numParticles * 2).fill(0).map(_ => rand(minSpeed, maxSpeed)));
     // build buffers
@@ -145,7 +148,7 @@ export default function Triangle() {
       // convert to seconds
       time *= 0.001;
       // Subtract the previous time from the current time
-      const deltaTime = Math.min(time - then, 1.0);
+      const deltaTime = Math.min(time - then, 0.1);
       // Remember the current time for the next frame.
       then = time;
 

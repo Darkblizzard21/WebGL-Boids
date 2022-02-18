@@ -189,7 +189,7 @@ void main() {
 
     // calculate velocity
     vec2 boidForces = avoidForce + alignForce + uniteForce + wallAvoidForce;
-    vec2 nextVelocity = oldVelocity + boidForces * deltaTime * forceModifier;
+    vec2 nextVelocity = oldVelocity + (boidForces * deltaTime * forceModifier);
 
     // add randomness
     float luck = random(vec4(oldVelocity, position));
