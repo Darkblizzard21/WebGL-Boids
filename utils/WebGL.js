@@ -14,6 +14,14 @@ export default class WebGLUtils {
         (near + far) / (near - far),
         1,
       ];
+    },
+    translation(x,y,z, dst) {
+      return [
+        [1,0,0,x],
+        [0,1,0,y],
+        [0,0,1,z],
+        [0,0,0,1]
+      ];
     }
   }
 
@@ -92,7 +100,7 @@ export default class WebGLUtils {
   makeVertexArray(gl, bufLocPairs) {
     const va = gl.createVertexArray();
     gl.bindVertexArray(va);
-    for (const [buffer, loc] of bufLocPairs) {
+    for (const [buffer, loc, instanced] of bufLocPairs) {
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       gl.enableVertexAttribArray(loc);
       gl.vertexAttribPointer(
@@ -103,6 +111,9 @@ export default class WebGLUtils {
         0,        // stride (0 = auto)
         0,        // offset
       );
+      if(instanced){
+        gl.vertexAttribDivisor(loc, 1);
+      }
     }
     return va;
   }

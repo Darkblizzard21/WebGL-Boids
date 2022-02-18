@@ -12,6 +12,31 @@ uniform vec2 allOldVelocities[200];
 
 out vec2 newVelocity;
 
+// Random Noise from stackoverflow https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl/17479300
+uint hash( uint x ) {
+    x += ( x << 10u );
+    x ^= ( x >>  6u );
+    x += ( x <<  3u );
+    x ^= ( x >> 11u );
+    x += ( x << 15u );
+    return x;
+}
+
+uint hash( uvec4 v ) { return hash( v.x ^ hash(v.y) ^ hash(v.z) ^ hash(v.w) ); }
+
+float floatConstruct( uint m ) {
+    const uint ieeeMantissa = 0x007FFFFFu; // binary32 mantissa bitmask
+    const uint ieeeOne      = 0x3F800000u; // 1.0 in IEEE binary32
+
+    m &= ieeeMantissa;                     // Keep only mantissa bits (fractional part)
+    m |= ieeeOne;                          // Add fractional part to 1.0
+
+    float  f = uintBitsToFloat( m );       // Range [1:2]
+    return f - 1.0;                        // Range [0:1]
+}
+
+float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
+// End Noise
 vec2 inLimits(vec2 vector) {
     float l = length(vector);
     if (maxSpeed < l){
@@ -31,12 +56,10 @@ float distanceToCanvasY(){
     return min(position.y, canvasDimensions.y - position.y);
 }
 
-vec2 projectOnPositive(vec2 from, vec2 to){
-    float dotProd = dot(from,to);
-    float dot = max(dotProd, -dotProd);
-    float toLength = length(to);
-    float mul = dot/(toLength * toLength);
-    return mul * to;
+vec2 rotate(vec2 origin, float rad){
+    float x = cos(rad)*origin.x - sin(rad) * origin.y;
+    float y = sin(rad)*origin.x + cos(rad) * origin.y;
+    return vec2(x, y);
 }
 
 vec2 calcChaseForce(vec2 targetPos, float targetRange){
@@ -64,25 +87,25 @@ void main() {
     float forceModifier = 1.0;
     // Avoidance Variables
     float avoidModifier = 1.2;
-    float avoidDesired = size * 2.0 + 5.0;
+    float avoidDesired = size * 2.0 + 10.0;
     vec2 avoidSum = vec2(0, 0);
     vec2 avoidForce = vec2(0, 0);
     int avoidCount = 0;
     // Align Variables
     float alignModifier = 1.0;
-    float alignRange = 50.0;
+    float alignRange = 25.0;
     vec2 alignSum = vec2(0, 0);
     vec2 alignForce = vec2(0, 0);
     int alignCount = 0;
     // Untie Variables
     float uniteModifier = 1.0;
-    float uniteRange = 100.0;
+    float uniteRange = 20.0;
     vec2 uniteSum = vec2(0, 0);
     vec2 uniteForce = vec2(0, 0);
     int uniteCount = 0;
     // Wall Collision Variables
-    float wallAvoidModifier = 1.2;
-    float wallAvoidRange = 150.0;
+    float wallAvoidModifier = 1.0;
+    float wallAvoidRange = 100.0;
     vec2 wallAvoidForce = vec2(0,0);
 
     // View Variables
@@ -158,7 +181,21 @@ void main() {
         uniteForce = calcChaseForce(targetPos, avoidDesired) * uniteModifier;
     }
 
+    // Avoid Walls
+    if(distanceToCanvasX() < wallAvoidRange || distanceToCanvasY() < wallAvoidRange){
+        wallAvoidForce = calcChaseForce(canvasDimensions/2.0, avoidDesired) * wallAvoidModifier;
+    }
+
+
+    // calculate velocity
     vec2 boidForces = avoidForce + alignForce + uniteForce + wallAvoidForce;
     vec2 nextVelocity = oldVelocity + boidForces * deltaTime * forceModifier;
+
+    // add randomness
+    float luck = random(vec4(oldVelocity, position));
+    if(luck < 0.05){
+        nextVelocity = rotate(nextVelocity, luck - 0.025);
+    }
+
     newVelocity = inLimits(nextVelocity);
 }

@@ -2,7 +2,7 @@ import React, {useRef, useEffect} from "react";
 import WebGLUtil from "./utils/WebGL";
 import "./WEbGLCanvas.scss";
 import {
-  drawParticlesFS,
+  drawParticlesFS, drawParticlesInstancedVS,
   drawParticlesVS,
   emptyFS,
   updatePositionVS,
@@ -43,6 +43,7 @@ export default function Triangle() {
       oldPosition: gl.getAttribLocation(updatePositionProgram, "oldPosition"),
       velocity: gl.getAttribLocation(updatePositionProgram, "velocity"),
       canvasDimensions: gl.getUniformLocation(updatePositionProgram, "canvasDimensions"),
+      margin: gl.getUniformLocation(updatePositionProgram, "margin"),
       deltaTime: gl.getUniformLocation(updatePositionProgram, "deltaTime")
     };
 
@@ -62,14 +63,15 @@ export default function Triangle() {
       return Math.random() * (max - min) + min;
     };
     const size = 7.0;
+    const margin = size * 2.0;
     const numParticles = 200;
     const minSpeed = 250;
     const maxSpeed = 300;
     const createPoints = (num, ranges) =>
       new Array(num).fill(0).map(_ => ranges.map(range => rand(...range))).flat();
     const positions = new Float32Array(createPoints(numParticles, [[canvas.current.width], [canvas.current.height]]));
-    const velocities = new Float32Array(createPoints(numParticles, [[-maxSpeed,maxSpeed], [-maxSpeed, maxSpeed]], true));
-    const maxSpeeds = new Float32Array(Array(numParticles*2).fill(0).map(_ => rand(minSpeed,maxSpeed)));
+    const velocities = new Float32Array(createPoints(numParticles, [[-maxSpeed, maxSpeed], [-maxSpeed, maxSpeed]], true));
+    const maxSpeeds = new Float32Array(Array(numParticles * 2).fill(0).map(_ => rand(minSpeed, maxSpeed)));
     // build buffers
     const position1Buffer = webGL.makeBuffer(gl, positions, gl.DYNAMIC_DRAW);
     const position2Buffer = webGL.makeBuffer(gl, positions, gl.DYNAMIC_DRAW);
@@ -143,7 +145,7 @@ export default function Triangle() {
       // convert to seconds
       time *= 0.001;
       // Subtract the previous time from the current time
-      const deltaTime = time - then;
+      const deltaTime = Math.min(time - then, 1.0);
       // Remember the current time for the next frame.
       then = time;
 
@@ -182,6 +184,7 @@ export default function Triangle() {
       gl.bindVertexArray(current.updatePositionVA);
       gl.uniform2f(updatePositionPrgLocs.canvasDimensions, gl.canvas.width, gl.canvas.height);
       gl.uniform1f(updatePositionPrgLocs.deltaTime, deltaTime);
+      gl.uniform1f(updatePositionPrgLocs.margin, margin);
 
       gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, current.ptf);
       gl.beginTransformFeedback(gl.POINTS);
