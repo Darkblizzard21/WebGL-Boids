@@ -259,14 +259,14 @@ const emptyFS = `#version 300 es
   `;
 
 const drawParticlesVS = `#version 300 es
-  in vec4 position;
+  in vec2 position;
   
   uniform float size;
   uniform mat4 matrix;
 
   void main() {
     // do the common matrix math
-    gl_Position = matrix * position;
+    gl_Position = matrix * vec4(position,0,1);
     gl_PointSize = size;
   }
   `;
@@ -280,25 +280,42 @@ const drawParticlesFS = `#version 300 es
   `;
 
 const drawParticlesInstancedVS = `#version 300 es
-  in vec4 vertPosition;
-  in vec4 particlePosition;
-  in vec4 velocity;
- 
-  uniform mat4 matrix;
+precision mediump float;
 
-  void main() {
-    // do the common matrix math
-    gl_Position = matrix * (vertPosition + particlePosition);
-  }
+in vec2 i_velocity;
+in vec2 i_offset;
+in vec2 a_position;
+in vec3 a_color;
+
+out vec4 v_color;
+
+float angleBetween(vec2 first, vec2 second){
+    return acos(dot(first,second)/(length(first)*length(second)));
+}
+  
+vec2 rotate(vec2 origin, float rad){
+    float x = cos(rad)*origin.x - sin(rad) * origin.y;
+    float y = sin(rad)*origin.x + cos(rad) * origin.y;
+    return vec2(x, y);
+}
+
+void main () {
+    float angle = angleBetween(vec2(0,1),i_velocity);
+    gl_Position = vec4(i_offset + rotate(a_position,angle),0,1); // x,y,z,w
+    v_color = vec4(a_color,1);
+}
   `;
 
 const drawParticlesInstancedFS = `#version 300 es
-  precision highp float;
-  out vec4 outColor;
-  void main() {
-    outColor = vec4(0, 1, 1, 1);
-  }
-  `;
+precision mediump float;
+
+out vec4 color;
+
+in vec4 v_color;
+
+void main () {
+    color = v_color;
+}`;
 
 export {
   vertexShader,
@@ -310,4 +327,4 @@ export {
   drawParticlesFS,
   drawParticlesInstancedVS,
   drawParticlesInstancedFS
-}
+};

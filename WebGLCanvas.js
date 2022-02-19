@@ -2,12 +2,13 @@ import React, {useRef, useEffect} from "react";
 import WebGLUtil from "./utils/WebGL";
 import "./WEbGLCanvas.scss";
 import {
-  drawParticlesFS, drawParticlesInstancedVS,
+  drawParticlesFS, drawParticlesInstancedFS, drawParticlesInstancedVS,
   drawParticlesVS,
   emptyFS,
   updatePositionVS,
   updateVelocityVS
 } from "./shader/shaderVar";
+import {ship} from "./models";
 
 
 const webGL = new WebGLUtil();
@@ -26,6 +27,8 @@ export default function Triangle() {
       gl, [updatePositionVS, emptyFS], ["newPosition"]);
     const drawParticlesProgram = webGL.createProgram(
       gl, [drawParticlesVS, drawParticlesFS]);
+    const drawInstancedProgram = webGL.createProgram(
+      gl, [drawParticlesInstancedVS, drawParticlesInstancedFS]);
 
     const updateVelocityPrgLocs = {
       position: gl.getAttribLocation(updateVelocityProgram, "position"),
@@ -51,6 +54,13 @@ export default function Triangle() {
       position: gl.getAttribLocation(drawParticlesProgram, "position"),
       matrix: gl.getUniformLocation(drawParticlesProgram, "matrix"),
       size: gl.getUniformLocation(drawParticlesProgram, "size")
+    };
+
+    const drawInstancedProgLocs = {
+      vertPosition: gl.getAttribLocation(drawInstancedProgram, "vertPosition"),
+      particlePosition: gl.getAttribLocation(drawInstancedProgram, "particlePosition"),
+      velocity: gl.getAttribLocation(drawInstancedProgram, "velocity"),
+      matrix: gl.getUniformLocation(drawInstancedProgram, "matrix")
     };
 
 
@@ -81,33 +91,34 @@ export default function Triangle() {
     const velocity1Buffer = webGL.makeBuffer(gl, velocities, gl.DYNAMIC_DRAW);
     const velocity2Buffer = webGL.makeBuffer(gl, velocities, gl.DYNAMIC_DRAW);
     const speedBuffer = webGL.makeBuffer(gl, maxSpeeds, gl.STATIC_DRAW);
+    const modelBuffer = webGL.makeBuffer(gl, ship.model, gl.STATIC_DRAW);
 
     // build vertex arrays
-    const updateVelocityVA1 = webGL.makeVertexArray(gl, [
+    const updateVelocityVA1 = webGL.makeVertexArray2f(gl, [
       [position1Buffer, updateVelocityPrgLocs.position],
       [velocity1Buffer, updateVelocityPrgLocs.oldVelocity],
       [speedBuffer, updateVelocityPrgLocs.maxSpeed]
     ]);
-    const updateVelocityVA2 = webGL.makeVertexArray(gl, [
+    const updateVelocityVA2 = webGL.makeVertexArray2f(gl, [
       [position2Buffer, updateVelocityPrgLocs.position],
       [velocity2Buffer, updateVelocityPrgLocs.oldVelocity],
       [speedBuffer, updateVelocityPrgLocs.maxSpeed]
     ]);
 
-    const updatePositionVA1 = webGL.makeVertexArray(gl, [
+    const updatePositionVA1 = webGL.makeVertexArray2f(gl, [
       [position1Buffer, updatePositionPrgLocs.oldPosition],
       [velocity2Buffer, updatePositionPrgLocs.velocity]
     ]);
 
-    const updatePositionVA2 = webGL.makeVertexArray(gl, [
+    const updatePositionVA2 = webGL.makeVertexArray2f(gl, [
       [position2Buffer, updatePositionPrgLocs.oldPosition],
       [velocity1Buffer, updatePositionPrgLocs.velocity]
     ]);
 
-    const drawVA1 = webGL.makeVertexArray(
+    const drawVA1 = webGL.makeVertexArray2f(
       gl, [[position1Buffer, drawParticlesProgLocs.position],
         [velocity1Buffer, updatePositionPrgLocs.velocity]]);
-    const drawVA2 = webGL.makeVertexArray(
+    const drawVA2 = webGL.makeVertexArray2f(
       gl, [[position2Buffer, drawParticlesProgLocs.position],
         [velocity2Buffer, updatePositionPrgLocs.velocity]]);
 
