@@ -1,3 +1,4 @@
+import util.ColorToBooleanFunc;
 import util.Vec2;
 
 import javax.imageio.ImageIO;
@@ -7,49 +8,63 @@ import java.io.File;
 import java.io.IOException;
 
 public class ForceFieldGen {
-    BufferedImage img;
+    BufferedImage original;
+    BufferedImage render;
     boolean generated = false;
-    boolean blur = false;
+    boolean useDegrees = false;
+    float degrees = 90.0f;
 
     ForceFieldGen(File in) {
         try {
-            img = ImageIO.read(in);
+            original = ImageIO.read(in);
         } catch (IOException e) {
             e.printStackTrace();
         }
     }
 
-    void enableBlur(boolean value) {
-        blur = value;
+    void enableCircularLila(){
+        useDegrees = true;
     }
-
-    void enableBlur() {
-        blur = true;
+    void setRotation(float deg){
+        degrees = deg;
     }
 
     void gen() {
         if (generated) return;
 
         System.out.println("Started Image Generation");
-        final long init = System.currentTimeMillis();;
+        final long init = System.currentTimeMillis();
         long start = init;
+        ColorToBooleanFunc hitBlack = (c) -> c.getBlue() == 0;
+        ColorToBooleanFunc hitOther = (c) -> c.getBlue() > 0;
+        BufferedImage img = new BufferedImage(original.getWidth(),original.getHeight(), original.getType());
+        for (int x = 0; x < original.getWidth(); x++) {
+            for (int y = 0; y < original.getHeight(); y++) {
+                Color current = new Color(original.getRGB(x, y));
+                boolean rotate = true;
+                ColorToBooleanFunc search = hitBlack;
+                if (current.getBlue() == 0) {
+                    rotate = false;
+                    search = hitOther;
+                }
+                else if(!useDegrees) continue;
 
-        for (int x = 0; x < img.getWidth(); x++) {
-            for (int y = 0; y < img.getHeight(); y++) {
-                Color current = new Color(img.getRGB(x, y));
-                if (current.equals(Color.BLACK)) continue;
-
-                Vec2[] empty = getNearestEmpty(x, y, 5);
+                Vec2[] empty = getNearestEmpty(x, y, 5, search, original);
                 Vec2 pos = new Vec2(x, y);
                 Vec2 dir = new Vec2(0, 0);
                 for (Vec2 target : empty) {
-                    dir = dir.add(pos.sub(target).through2Length());
+                    dir = dir.add(target.sub(pos).through2Length());
                 }
+                if(rotate)
+                    dir = dir.rotated(degrees);
                 img.setRGB(x, y, dir.toColor().getRGB());
             }
             System.out.println("Row " + x + " Completed");
         }
 
+        render = img;
+        String outPath = ".\\mediaOut\\0.png";
+        save(new File(outPath));
         long vectorGenTime = System.currentTimeMillis();
         System.out.println("Finished Vector Gen in " + (vectorGenTime- start) / 1000.0 + " Seconds.");
         start = System.currentTimeMillis();
@@ -58,7 +73,7 @@ public class ForceFieldGen {
         for (int x = 0; x < img.getWidth(); x++) {
             for (int y = 0; y < img.getHeight(); y++) {
                 Color current = new Color(img.getRGB(x, y));
-                if (current.getBlue() < 50)
+                if (current.getBlue() == 0)
                     img.setRGB(x, y, neutral.getRGB());
             }
         }
@@ -67,6 +82,9 @@ public class ForceFieldGen {
         System.out.println("Cleared Empty value in " + (clearETime - start) + " Millis.");
         start = System.currentTimeMillis();
 
+
+        outPath = ".\\mediaOut\\1.png";
+        save(new File(outPath));
         // Clear Blue
         for (int x = 0; x < img.getWidth(); x++) {
             for (int y = 0; y < img.getHeight(); y++) {
@@ -75,30 +93,15 @@ public class ForceFieldGen {
                 img.setRGB(x, y, next.getRGB());
             }
         }
-
         long clearBTime = System.currentTimeMillis();
         System.out.println("Cleared Blue value in " + (clearBTime - start) + " Millis.");
         start = System.currentTimeMillis();
 
-        // Blur
-        if (blur) {
-            BufferedImage blurred = new BufferedImage(img.getWidth(), img.getHeight(), img.getType());
-
-            for (int x = 0; x < img.getWidth(); x++) {
-                for (int y = 0; y < img.getHeight(); y++) {
-                    blurred.setRGB(x, y, blurredColor(x, y).getRGB());
-                }
-            }
-
-            img = blurred;
-
-            long blurTime = System.currentTimeMillis();
-            System.out.println("Blurred Image in " + (blurTime - start) + " Millis.");
-            start = System.currentTimeMillis();
-        }
 
         long totalTime = System.currentTimeMillis();
         System.out.println("Generation finished in " + (totalTime-init) / 1000.0 + " Seconds.");
+
+        render = img;
         generated = true;
     }
 
@@ -106,14 +109,14 @@ public class ForceFieldGen {
         try {
             if (!out.exists() && !out.createNewFile())
                 throw new IllegalStateException();
-            ImageIO.write(img, "png", out);
+            ImageIO.write(render, "png", out);
         } catch (IOException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
     }
 
-    private Vec2[] getNearestEmpty(int x, int y, int searchCount) {
+    private Vec2[] getNearestEmpty(int x, int y, int searchCount, ColorToBooleanFunc func, BufferedImage img) {
         Vec2 pos = new Vec2(x, y);
         Vec2[] res = new Vec2[searchCount];
         Vec2 unreachable = new Vec2(img.getWidth() * 4, img.getHeight() * 4);
@@ -123,7 +126,7 @@ public class ForceFieldGen {
         for (int ix = 0; ix < img.getWidth(); ix++) {
             for (int iy = 0; iy < img.getHeight(); iy++) {
                 Color current = new Color(img.getRGB(ix, iy));
-                if (current.getBlue() < 50) {
+                if (func.op(current)) {
                     Vec2 newContender = new Vec2(ix, iy);
                     for (int i = 0; i < searchCount; i++) {
                         if (res[i].distanceTo(pos) > newContender.distanceTo(pos)) {
@@ -139,20 +142,5 @@ public class ForceFieldGen {
         }
 
         return res;
-    }
-
-    private Color blurredColor(int x, int y) {
-        int r = 0, g = 0, b = 0, count = 0;
-
-        for (int ix = Math.max(x - 1, 0); ix < Math.min(x + 2, img.getWidth()); ix++) {
-            for (int iy = Math.max(y - 1, 0); iy < Math.min(y + 2, img.getHeight()); iy++) {
-                Color color = new Color(img.getRGB(x, y));
-                r += color.getRed();
-                g += color.getGreen();
-                b += color.getBlue();
-                count++;
-            }
-        }
-        return new Color(r / count, g / count, b / count);
     }
 }

@@ -2,6 +2,9 @@ package util;
 
 import java.awt.*;
 
+import static java.lang.Math.cos;
+import static java.lang.Math.sin;
+
 public class Vec2 {
     public double x;
     public double y;
@@ -24,8 +27,11 @@ public class Vec2 {
 
 
     public Color toColor(){
+        return toColor(1.0f);
+    }
+    public Color toColor(float b){
         Vec2 normalized = this.normalized();
-        return new Color((float) (normalized.x * 0.5 + 0.5), (float) (normalized.y * 0.5 + 0.5), 1.0f);
+        return new Color((float) (normalized.x * 0.5 + 0.5), (float) (normalized.y * 0.5 + 0.5), b);
     }
 
     public Vec2 add(Vec2 other){
@@ -54,11 +60,27 @@ public class Vec2 {
         return new Vec2(x / length,y / length);
     }
 
+    public Vec2 rotated(float degrees) {
+        float rad = (float) Math.toRadians(degrees);
+        double x = cos(rad)*this.x - sin(rad) * this.y;
+        double y = sin(rad)*this.x + cos(rad) * this.y;
+        return new Vec2(x, y);
+    }
+
+
     public double length(){
         return Math.sqrt(x * x + y * y);
     }
 
     public double distanceTo(Vec2 other){
         return sub(other).length();
+    }
+
+    @Override
+    public String toString() {
+        return "Vec2{" +
+                "x=" + x +
+                ", y=" + y +
+                '}';
     }
 }

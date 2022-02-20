@@ -21,9 +21,9 @@ const ID_VA = (gl, webGL,
                pos1Buffer, pos2Buffer,
                vel1Buffer, vel2Buffer,
                drawInstancedProgLocs,
-               numParticles) => {
+               numParticles, colors) => {
   const modelBuffer = webGL.makeBuffer(gl, ship.modelAndColor, gl.STATIC_DRAW);
-  const colorBuffer = webGL.makeBuffer(gl, new Float32Array([.26, .66, .49, 0.5, 1, 1]), gl.STATIC_DRAW);
+  const colorBuffer = webGL.makeBuffer(gl, new Float32Array(colors), gl.STATIC_DRAW);
 
   const makeInstancedVA = (posBuffer, velBuffer) => {
     const instancedVA = gl.createVertexArray();
@@ -35,7 +35,7 @@ const ID_VA = (gl, webGL,
 
     gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
     gl.vertexAttribPointer(drawInstancedProgLocs.a_color, 3, gl.FLOAT, false, 0, 0);
-    gl.vertexAttribDivisor(drawInstancedProgLocs.a_color, numParticles - 1);
+    gl.vertexAttribDivisor(drawInstancedProgLocs.a_color, colors.length > 3 ? numParticles - 1 : numParticles);
     gl.enableVertexAttribArray(drawInstancedProgLocs.a_color);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
@@ -74,7 +74,7 @@ const ID_Draw = (gl, webGL,
     webGL.m4.orthographic(0, gl.canvas.width, 0, gl.canvas.height, -1, 1));
   gl.uniform1f(drawInstancedProgLocs.scale, size);
   // draw
-  gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, numParticles);
+  gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, 14*14);
 };
 
 export {

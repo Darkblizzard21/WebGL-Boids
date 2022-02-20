@@ -5,26 +5,37 @@ import {ID_Draw, ID_ProgramAndLocs, ID_VA} from "./utils/instanceDraw";
 import {UV_ProgramAndLocs, UV_VA_FB, UV_Update} from "./utils/updateVelocity";
 import {rand} from "./utils/utility";
 import {UP_ProgramAndLocs, UP_Update, UP_VA_FB} from "./utils/updatePosition";
-
+import {
+  activateTexture, deactivateTexture,
+  UFVT_BindTexture,
+  UVFT_ProgramAndLocs,
+  UVFT_Update,
+  UVFT_VA_FB
+} from "./utils/updateVelocityForceTexture";
 
 const webGL = new WebGLUtil();
 
 const loadImage = (src) => new Promise(resolve => {
   const image = new Image();
-  image.src = src;
   image.addEventListener("load", () => resolve(image));
+  image.src = src;
 });
 
-export default function Boids() {
+export default function Boids(texture) {
   const canvas = useRef();
-
+  const useTexture = texture && Object.keys(texture).length !== 0;
+  const imgRef = useRef();
+  let image = undefined;
+  let textureBinding = undefined;
   useEffect(() => {
     console.log("prepare rendering");
     webGL.resizeCanvasToDisplaySize(canvas.current);
     const gl = webGL.getGLContext(canvas.current);
 
     // Load Programs and locations
-    const updateVelocityPL = UV_ProgramAndLocs(gl, webGL);
+    const updateVelocityPL = useTexture ?
+      UVFT_ProgramAndLocs(gl, webGL) :
+      UV_ProgramAndLocs(gl, webGL);
     const updateVelocityProgram = updateVelocityPL.program;
     const updateVelocityPrgLocs = updateVelocityPL.locations;
 
@@ -41,15 +52,15 @@ export default function Boids() {
     const margin = size * 2.0;
     const numParticles = 200;
     const minSpeed = 50;
-    const minMaxSpeed = 200;
-    const maxSpeed = 350;
+    const minMaxSpeed = useTexture ? 100 : 200;
+    const maxSpeed = useTexture ? 250 : 350;
     const spawnMargin = 0.2;
     const createPoints = (num, ranges) =>
       new Array(num).fill(0).map(_ => ranges.map(range => rand(...range))).flat();
     const positions = new Float32Array(createPoints(numParticles,
       [[canvas.current.width * spawnMargin, canvas.current.width * (1 - spawnMargin)],
         [canvas.current.height * spawnMargin, canvas.current.height * (1 - spawnMargin)]]));
-    const velocities = new Float32Array(createPoints(numParticles, [[-maxSpeed, maxSpeed], [-maxSpeed, maxSpeed]], true));
+    const velocities = new Float32Array(createPoints(numParticles, useTexture ? [[0, 0.001], [0.999, 1.0]] : [[-maxSpeed, maxSpeed], [-maxSpeed, maxSpeed]], true));
     const maxSpeeds = new Float32Array(Array(numParticles * 2).fill(0).map(_ => rand(minMaxSpeed, maxSpeed)));
 
 
@@ -61,10 +72,15 @@ export default function Boids() {
     const speedBuffer = webGL.makeBuffer(gl, maxSpeeds, gl.STATIC_DRAW);
 
     // build updateVelocity vertex arrays
-    const uvvafb = UV_VA_FB(gl, webGL,
-      position1Buffer, position2Buffer,
-      velocity1Buffer, velocity2Buffer,
-      speedBuffer, updateVelocityPrgLocs);
+    const uvvafb = useTexture ?
+      UVFT_VA_FB(gl, webGL,
+        position1Buffer, position2Buffer,
+        velocity1Buffer, velocity2Buffer,
+        speedBuffer, updateVelocityPrgLocs) :
+      UV_VA_FB(gl, webGL,
+        position1Buffer, position2Buffer,
+        velocity1Buffer, velocity2Buffer,
+        speedBuffer, updateVelocityPrgLocs);
 
     const updateVelocityVA1 = uvvafb.va1;
     const updateVelocityVA2 = uvvafb.va2;
@@ -92,7 +108,8 @@ export default function Boids() {
       position1Buffer, position2Buffer,
       velocity1Buffer, velocity2Buffer,
       drawInstancedProgLocs,
-      numParticles);
+      numParticles,
+      useTexture ? [.26, .66, .49] : [.26, .66, .49, 0.5, 1, 1]);
 
     // set up collections
     let current = {
@@ -127,9 +144,14 @@ export default function Boids() {
       webGL.resizeCanvasToDisplaySize(gl.canvas);
 
       // compute the new velocities
-      UV_Update(gl,
-        updateVelocityProgram, updateVelocityPrgLocs,
-        minSpeed, deltaTime, numParticles, size, current);
+      useTexture ?
+        UVFT_Update(gl,
+          updateVelocityProgram, updateVelocityPrgLocs,
+          minSpeed, deltaTime, numParticles, size, current,
+          textureBinding) :
+        UV_Update(gl,
+          updateVelocityProgram, updateVelocityPrgLocs,
+          minSpeed, deltaTime, numParticles, size, current);
 
       // compute the new positions
 
@@ -154,11 +176,35 @@ export default function Boids() {
       requestAnimationFrame(render);
     }
 
-    console.log("start rendering");
-    requestAnimationFrame(render);
+    if (useTexture) {
+      const startAfterLoad = async () => {
+        image = await loadImage(imgRef.current.src);
+        textureBinding = UFVT_BindTexture(gl, updateVelocityProgram, image);
+        requestAnimationFrame(render);
+      };
+      startAfterLoad();
+    } else {
+      console.log("start rendering");
+      requestAnimationFrame(render);
+    }
   }, []);
 
   return (
-    <canvas id="WebGL" className="web-canvas" ref={canvas}>Your browser doesn't appear to support the
-      <code>&lt;canvas&gt;</code> element.</canvas>);
+    <div> {useTexture ? (<img className="hidden" src={texture} ref={imgRef}></img>) : null}
+      <canvas id="WebGL"
+              className="web-canvas"
+              ref={canvas}
+              onMouseOver={event => {
+                if (useTexture) {
+                  activateTexture();
+                }
+              }}
+              onMouseOut={event => {
+                if (useTexture) {
+                  deactivateTexture();
+                }
+              }}>Your browser doesn't appear to support the
+        <code>&lt;canvas&gt;</code> element.
+      </canvas>
+    </div>);
 }

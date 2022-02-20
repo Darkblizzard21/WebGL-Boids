@@ -27,14 +27,35 @@ in vec2 position;
 in vec2 oldVelocity;
 in float maxSpeed;
 
-uniform float minSpeed;
-uniform float size;
+// Data Uniforms
 uniform float deltaTime;
 uniform vec2 canvasDimensions;
 uniform vec2 allOldPositions[200];
 uniform vec2 allOldVelocities[200];
 
+// General Config Uniform
+uniform float minSpeed;
+uniform float size;
+uniform float forceModifier;
+uniform float maxRotation;
+uniform float VoFhalf;
+// Avoid Conifg Uniform
+uniform float avoidModifier;
+uniform float avoidDesired;
+// Align Conifg Uniform
+uniform float alignModifier;
+uniform float alignRange;
+// Unite Config Uniform
+uniform float uniteModifier;
+uniform float uniteRange;
+// Wall Avoidance Uniform
+uniform float wallAvoidModifier;
+uniform float wallAvoidRange;
+
+// Transform Feedback
 out vec2 newVelocity;
+
+//#textureInput
 
 // Random Noise from stackoverflow https://stackoverflow.com/questions/4200224/random-noise-functions-for-glsl/17479300
 uint hash( uint x ) {
@@ -85,7 +106,7 @@ float angleBetween(vec2 first, vec2 second){
     float divisor = length(first)*length(second);
     float rotation = acos(dividend/divisor);
     if(first.x > 0.0)
-      rotation = -rotation;
+    rotation = -rotation;
     return rotation;
 }
 
@@ -116,35 +137,26 @@ vec2 calcChaseForce(vec2 targetPos, float targetRange){
     return inLimits(diff);
 }
 
+//#textureFunctions
+
 void main() {
-    float forceModifier = 1.0;
-    float maxRotation = 360.0;
     // Avoidance Variables
-    float avoidModifier = 1.2;
-    float avoidDesired = 11.0;
     vec2 avoidSum = vec2(0, 0);
     vec2 avoidForce = vec2(0, 0);
     int avoidCount = 0;
     // Align Variables
-    float alignModifier = 1.0;
-    float alignRange = 35.0;
     vec2 alignSum = vec2(0, 0);
     vec2 alignForce = vec2(0, 0);
     int alignCount = 0;
     // Untie Variables
-    float uniteModifier = 1.0;
-    float uniteRange = 20.0;
     vec2 uniteSum = vec2(0, 0);
     vec2 uniteForce = vec2(0, 0);
     int uniteCount = 0;
     // Wall Collision Variables
-    float wallAvoidModifier = 1.4;
-    float wallAvoidRange = 120.0;
     vec2 wallAvoidForce = vec2(0,0);
 
     // View Variables
     float viewDistance = max(max(alignRange,avoidDesired),uniteRange);
-    float VoFhalf = 120.0;
 
     // Collect nearby boids
     int nearCount = 0;
@@ -214,26 +226,29 @@ void main() {
         vec2 targetPos = uniteSum / vec2(uniteCount, uniteCount);
         uniteForce = calcChaseForce(targetPos, avoidDesired) * uniteModifier;
     }
-   
-    
+
+
     // Avoid Walls
     if(distanceToCanvasX() < wallAvoidRange || distanceToCanvasY() < wallAvoidRange){
         wallAvoidForce = calcChaseForce(canvasDimensions/2.0, avoidDesired) * wallAvoidModifier;
     }
-    
-    
+
+
     // calculate velocity
     vec2 boidForces = avoidForce + alignForce + uniteForce + wallAvoidForce;
+
+    //#textureForces
+
     vec2 nextVelocity = oldVelocity + (boidForces * deltaTime * forceModifier);
-    
+
     // add randomness
     float luck = random(vec4(oldVelocity, position));
     if(luck < 0.05){
         nextVelocity = rotate(nextVelocity, (luck - 0.025));
     }
-    
+
     newVelocity = inLimits(nextVelocity);
-    
+
     // Smooth Rotation
     float deltaAngle = angleBetween(newVelocity, oldVelocity);
     if(maxRotation * deltaTime < abs(deltaAngle)){
@@ -241,7 +256,7 @@ void main() {
         float length = length(newVelocity);
         newVelocity = normalize(rotate(oldVelocity,allowedAngle)) * length;
     }
-    
+
 }
   `;
 
