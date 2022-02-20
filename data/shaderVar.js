@@ -80,6 +80,15 @@ float distanceToCanvasY(){
     return min(position.y, canvasDimensions.y - position.y);
 }
 
+float angleBetween(vec2 first, vec2 second){
+    float dividend = dot(first,second);
+    float divisor = length(first)*length(second);
+    float rotation = acos(dividend/divisor);
+    if(first.x > 0.0)
+      rotation = -rotation;
+    return rotation;
+}
+
 vec2 rotate(vec2 origin, float rad){
     float x = cos(rad)*origin.x - sin(rad) * origin.y;
     float y = sin(rad)*origin.x + cos(rad) * origin.y;
@@ -109,15 +118,16 @@ vec2 calcChaseForce(vec2 targetPos, float targetRange){
 
 void main() {
     float forceModifier = 1.0;
+    float maxRotation = 360.0;
     // Avoidance Variables
     float avoidModifier = 1.2;
-    float avoidDesired = size * 2.0 + 10.0;
+    float avoidDesired = 11.0;
     vec2 avoidSum = vec2(0, 0);
     vec2 avoidForce = vec2(0, 0);
     int avoidCount = 0;
     // Align Variables
     float alignModifier = 1.0;
-    float alignRange = 25.0;
+    float alignRange = 35.0;
     vec2 alignSum = vec2(0, 0);
     vec2 alignForce = vec2(0, 0);
     int alignCount = 0;
@@ -128,8 +138,8 @@ void main() {
     vec2 uniteForce = vec2(0, 0);
     int uniteCount = 0;
     // Wall Collision Variables
-    float wallAvoidModifier = 1.0;
-    float wallAvoidRange = 100.0;
+    float wallAvoidModifier = 1.4;
+    float wallAvoidRange = 120.0;
     vec2 wallAvoidForce = vec2(0,0);
 
     // View Variables
@@ -146,7 +156,7 @@ void main() {
         if (otherPosition.x == position.x && otherPosition.y == position.y)
         continue;
         vec2 distanceTo = otherPosition - position;
-        float angle = acos(dot(normalize(oldVelocity), normalize(distanceTo)));
+        float angle = angleBetween(oldVelocity, distanceTo);
         if (length(distanceTo) < viewDistance && -VoFhalf < angle && VoFhalf > angle) {
             relevantBoidsPositions[nearCount] = otherPosition;
             relevantBoidsVelocities[nearCount] = allOldVelocities[i];
@@ -204,6 +214,7 @@ void main() {
         vec2 targetPos = uniteSum / vec2(uniteCount, uniteCount);
         uniteForce = calcChaseForce(targetPos, avoidDesired) * uniteModifier;
     }
+   
     
     // Avoid Walls
     if(distanceToCanvasX() < wallAvoidRange || distanceToCanvasY() < wallAvoidRange){
@@ -218,10 +229,19 @@ void main() {
     // add randomness
     float luck = random(vec4(oldVelocity, position));
     if(luck < 0.05){
-        nextVelocity = rotate(nextVelocity, luck - 0.025);
+        nextVelocity = rotate(nextVelocity, (luck - 0.025));
     }
     
     newVelocity = inLimits(nextVelocity);
+    
+    // Smooth Rotation
+    float deltaAngle = angleBetween(newVelocity, oldVelocity);
+    if(maxRotation * deltaTime < abs(deltaAngle)){
+        float allowedAngle = maxRotation * deltaTime * sign(deltaAngle);
+        float length = length(newVelocity);
+        newVelocity = normalize(rotate(oldVelocity,allowedAngle)) * length;
+    }
+    
 }
   `;
 
@@ -282,15 +302,24 @@ const drawParticlesFS = `#version 300 es
 const drawParticlesInstancedVS = `#version 300 es
 precision mediump float;
 
+
 in vec2 i_velocity;
 in vec2 i_offset;
 in vec2 a_position;
 in vec3 a_color;
 
+uniform mat4 matrix;
+uniform float scale;
+
 out vec4 v_color;
 
 float angleBetween(vec2 first, vec2 second){
-    return acos(dot(first,second)/(length(first)*length(second)));
+    float dividend = dot(first,second);
+    float divisor = length(first)*length(second);
+    float rotation = acos(dividend/divisor);
+    if(first.x > 0.0)
+      rotation = -rotation;
+    return rotation;
 }
   
 vec2 rotate(vec2 origin, float rad){
@@ -300,8 +329,9 @@ vec2 rotate(vec2 origin, float rad){
 }
 
 void main () {
-    float angle = angleBetween(vec2(0,1),i_velocity);
-    gl_Position = vec4(i_offset + rotate(a_position,angle),0,1); // x,y,z,w
+    float rotation = angleBetween(i_velocity,vec2(0,1));
+    vec2 scaledPosition = a_position * scale;
+    gl_Position = matrix * vec4(i_offset + (rotate(scaledPosition,rotation)),0,1); // x,y,z,w
     v_color = vec4(a_color,1);
 }
   `;

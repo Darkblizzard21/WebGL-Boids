@@ -108,11 +108,8 @@ export default class WebGLUtils {
   makeVertexArray2f(gl, bufLocPairs) {
     const va = gl.createVertexArray();
     gl.bindVertexArray(va);
-    for (const [buffer, loc, instanced] of bufLocPairs) {
+    for (const [buffer, loc] of bufLocPairs) {
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-      if(instanced){
-        gl.vertexAttribDivisor(loc, 1);
-      }
       gl.vertexAttribPointer(
         loc,      // attribute location
         2,        // number of elements

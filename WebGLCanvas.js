@@ -1,19 +1,21 @@
 import React, {useRef, useEffect} from "react";
 import WebGLUtil from "./utils/WebGL";
 import "./WEbGLCanvas.scss";
-import {
-  drawParticlesFS, drawParticlesInstancedFS, drawParticlesInstancedVS,
-  drawParticlesVS,
-  emptyFS,
-  updatePositionVS,
-  updateVelocityVS
-} from "./shader/shaderVar";
-import {ship} from "./models";
+import {ID_Draw, ID_ProgramAndLocs, ID_VA} from "./utils/instanceDraw";
+import {UV_ProgramAndLocs, UV_VA_FB, UV_Update} from "./utils/updateVelocity";
+import {rand} from "./utils/utility";
+import {UP_ProgramAndLocs, UP_Update, UP_VA_FB} from "./utils/updatePosition";
 
 
 const webGL = new WebGLUtil();
 
-export default function Triangle() {
+const loadImage = (src) => new Promise(resolve => {
+  const image = new Image();
+  image.src = src;
+  image.addEventListener("load", () => resolve(image));
+});
+
+export default function Boids() {
   const canvas = useRef();
 
   useEffect(() => {
@@ -21,61 +23,25 @@ export default function Triangle() {
     webGL.resizeCanvasToDisplaySize(canvas.current);
     const gl = webGL.getGLContext(canvas.current);
 
-    const updateVelocityProgram = webGL.createProgram(
-      gl, [updateVelocityVS, emptyFS], ["newVelocity"]);
-    const updatePositionProgram = webGL.createProgram(
-      gl, [updatePositionVS, emptyFS], ["newPosition"]);
-    const drawParticlesProgram = webGL.createProgram(
-      gl, [drawParticlesVS, drawParticlesFS]);
-    const drawInstancedProgram = webGL.createProgram(
-      gl, [drawParticlesInstancedVS, drawParticlesInstancedFS]);
+    // Load Programs and locations
+    const updateVelocityPL = UV_ProgramAndLocs(gl, webGL);
+    const updateVelocityProgram = updateVelocityPL.program;
+    const updateVelocityPrgLocs = updateVelocityPL.locations;
 
-    const updateVelocityPrgLocs = {
-      position: gl.getAttribLocation(updateVelocityProgram, "position"),
-      oldVelocity: gl.getAttribLocation(updateVelocityProgram, "oldVelocity"),
-      maxSpeed: gl.getAttribLocation(updateVelocityProgram, "maxSpeed"),
-      minSpeed: gl.getUniformLocation(drawParticlesProgram, "minSpeed"),
-      size: gl.getUniformLocation(drawParticlesProgram, "size"),
-      deltaTime: gl.getUniformLocation(updateVelocityProgram, "deltaTime"),
-      canvasDimensions: gl.getUniformLocation(updateVelocityProgram, "canvasDimensions"),
-      allOldPositions: gl.getUniformLocation(updateVelocityProgram, "allOldPositions"),
-      allOldVelocities: gl.getUniformLocation(updateVelocityProgram, "allOldVelocities")
-    };
+    const updatePositionPL = UP_ProgramAndLocs(gl, webGL);
+    const updatePositionProgram = updatePositionPL.program;
+    const updatePositionPrgLocs = updatePositionPL.locations;
 
-    const updatePositionPrgLocs = {
-      oldPosition: gl.getAttribLocation(updatePositionProgram, "oldPosition"),
-      velocity: gl.getAttribLocation(updatePositionProgram, "velocity"),
-      canvasDimensions: gl.getUniformLocation(updatePositionProgram, "canvasDimensions"),
-      margin: gl.getUniformLocation(updatePositionProgram, "margin"),
-      deltaTime: gl.getUniformLocation(updatePositionProgram, "deltaTime")
-    };
-
-    const drawParticlesProgLocs = {
-      position: gl.getAttribLocation(drawParticlesProgram, "position"),
-      matrix: gl.getUniformLocation(drawParticlesProgram, "matrix"),
-      size: gl.getUniformLocation(drawParticlesProgram, "size")
-    };
-
-    const drawInstancedProgLocs = {
-      vertPosition: gl.getAttribLocation(drawInstancedProgram, "vertPosition"),
-      particlePosition: gl.getAttribLocation(drawInstancedProgram, "particlePosition"),
-      velocity: gl.getAttribLocation(drawInstancedProgram, "velocity"),
-      matrix: gl.getUniformLocation(drawInstancedProgram, "matrix")
-    };
-
+    const drawPL = ID_ProgramAndLocs(gl, webGL);
+    const drawInstancedProgram = drawPL.program;
+    const drawInstancedProgLocs = drawPL.locations;
 
     // create random positions and velocities.
-    const rand = (min, max) => {
-      if (max === undefined) {
-        max = min;
-        min = 0;
-      }
-      return Math.random() * (max - min) + min;
-    };
     const size = 7.0;
     const margin = size * 2.0;
     const numParticles = 200;
-    const minSpeed = 150;
+    const minSpeed = 50;
+    const minMaxSpeed = 200;
     const maxSpeed = 350;
     const spawnMargin = 0.2;
     const createPoints = (num, ranges) =>
@@ -84,54 +50,49 @@ export default function Triangle() {
       [[canvas.current.width * spawnMargin, canvas.current.width * (1 - spawnMargin)],
         [canvas.current.height * spawnMargin, canvas.current.height * (1 - spawnMargin)]]));
     const velocities = new Float32Array(createPoints(numParticles, [[-maxSpeed, maxSpeed], [-maxSpeed, maxSpeed]], true));
-    const maxSpeeds = new Float32Array(Array(numParticles * 2).fill(0).map(_ => rand(minSpeed, maxSpeed)));
+    const maxSpeeds = new Float32Array(Array(numParticles * 2).fill(0).map(_ => rand(minMaxSpeed, maxSpeed)));
+
+
     // build buffers
     const position1Buffer = webGL.makeBuffer(gl, positions, gl.DYNAMIC_DRAW);
     const position2Buffer = webGL.makeBuffer(gl, positions, gl.DYNAMIC_DRAW);
     const velocity1Buffer = webGL.makeBuffer(gl, velocities, gl.DYNAMIC_DRAW);
     const velocity2Buffer = webGL.makeBuffer(gl, velocities, gl.DYNAMIC_DRAW);
     const speedBuffer = webGL.makeBuffer(gl, maxSpeeds, gl.STATIC_DRAW);
-    const modelBuffer = webGL.makeBuffer(gl, ship.model, gl.STATIC_DRAW);
 
-    // build vertex arrays
-    const updateVelocityVA1 = webGL.makeVertexArray2f(gl, [
-      [position1Buffer, updateVelocityPrgLocs.position],
-      [velocity1Buffer, updateVelocityPrgLocs.oldVelocity],
-      [speedBuffer, updateVelocityPrgLocs.maxSpeed]
-    ]);
-    const updateVelocityVA2 = webGL.makeVertexArray2f(gl, [
-      [position2Buffer, updateVelocityPrgLocs.position],
-      [velocity2Buffer, updateVelocityPrgLocs.oldVelocity],
-      [speedBuffer, updateVelocityPrgLocs.maxSpeed]
-    ]);
+    // build updateVelocity vertex arrays
+    const uvvafb = UV_VA_FB(gl, webGL,
+      position1Buffer, position2Buffer,
+      velocity1Buffer, velocity2Buffer,
+      speedBuffer, updateVelocityPrgLocs);
 
-    const updatePositionVA1 = webGL.makeVertexArray2f(gl, [
-      [position1Buffer, updatePositionPrgLocs.oldPosition],
-      [velocity2Buffer, updatePositionPrgLocs.velocity]
-    ]);
+    const updateVelocityVA1 = uvvafb.va1;
+    const updateVelocityVA2 = uvvafb.va2;
+    const velocityFB1 = uvvafb.fb1;
+    const velocityFB2 = uvvafb.fb2;
 
-    const updatePositionVA2 = webGL.makeVertexArray2f(gl, [
-      [position2Buffer, updatePositionPrgLocs.oldPosition],
-      [velocity1Buffer, updatePositionPrgLocs.velocity]
-    ]);
+    // build updatePosition vertex arrays
+    const upvafb = UP_VA_FB(gl, webGL,
+      position1Buffer, position2Buffer,
+      velocity1Buffer, velocity2Buffer,
+      updatePositionPrgLocs);
 
-    const drawVA1 = webGL.makeVertexArray2f(
-      gl, [[position1Buffer, drawParticlesProgLocs.position],
-        [velocity1Buffer, updatePositionPrgLocs.velocity]]);
-    const drawVA2 = webGL.makeVertexArray2f(
-      gl, [[position2Buffer, drawParticlesProgLocs.position],
-        [velocity2Buffer, updatePositionPrgLocs.velocity]]);
-
-    // build transform feedback
-    const velocityFB1 = webGL.makeTransformFeedback(gl, velocity1Buffer);
-    const velocityFB2 = webGL.makeTransformFeedback(gl, velocity2Buffer);
-
-    const positionFB1 = webGL.makeTransformFeedback(gl, position1Buffer);
-    const positionFB2 = webGL.makeTransformFeedback(gl, position2Buffer);
+    const updatePositionVA1 = upvafb.va1;
+    const updatePositionVA2 = upvafb.va2;
+    const positionFB1 = upvafb.fb1;
+    const positionFB2 = upvafb.fb2;
 
     // unbind left over stuff
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
     gl.bindBuffer(gl.TRANSFORM_FEEDBACK_BUFFER, null);
+
+    // build instancedVa
+
+    const instancedVA = ID_VA(gl, webGL,
+      position1Buffer, position2Buffer,
+      velocity1Buffer, velocity2Buffer,
+      drawInstancedProgLocs,
+      numParticles);
 
     // set up collections
     let current = {
@@ -141,7 +102,7 @@ export default function Triangle() {
       updatePositionVA: updatePositionVA1,  // read from position1
       vtf: velocityFB2,                      // write to velocity2
       ptf: positionFB2,                      // write to position2
-      drawVA: drawVA2              // draw with position2
+      instancedDrawVA: instancedVA.va2
     };
     let next = {
       vReadBuffer: velocity2Buffer,
@@ -149,8 +110,8 @@ export default function Triangle() {
       updateVelocityVA: updateVelocityVA2,  // read from velocity2
       updatePositionVA: updatePositionVA2,  // read from position2
       vtf: velocityFB1,                      // write to velocity1
-      ptf: positionFB1,                      // write to position1
-      drawVA: drawVA1              // draw with position1
+      ptf: positionFB1,                     // write to position1
+      instancedDrawVA: instancedVA.va1
     };
 
     let then = 0;
@@ -166,59 +127,22 @@ export default function Triangle() {
       webGL.resizeCanvasToDisplaySize(gl.canvas);
 
       // compute the new velocities
-      gl.useProgram(updateVelocityProgram);
-      gl.bindVertexArray(current.updateVelocityVA);
-      gl.uniform1f(updateVelocityPrgLocs.minSpeed, minSpeed);
-      gl.uniform1f(updateVelocityPrgLocs.size, size);
-      gl.uniform1f(updateVelocityPrgLocs.deltaTime, deltaTime);
-      gl.uniform2f(updateVelocityPrgLocs.canvasDimensions, gl.canvas.width, gl.canvas.height);
-
-      let positionsView = new Float32Array(numParticles * 2);
-      gl.bindBuffer(gl.ARRAY_BUFFER, current.pReadBuffer === position1Buffer ? position1Buffer : position2Buffer);
-      gl.getBufferSubData(gl.ARRAY_BUFFER, 0, positionsView);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-      gl.uniform2fv(updateVelocityPrgLocs.allOldPositions, positionsView);
-      let velocitiesView = new Float32Array(numParticles * 2);
-      gl.bindBuffer(gl.ARRAY_BUFFER, current.vReadBuffer === velocity1Buffer ? velocity1Buffer : velocity2Buffer);
-      gl.getBufferSubData(gl.ARRAY_BUFFER, 0, velocitiesView);
-      gl.bindBuffer(gl.ARRAY_BUFFER, null);
-      gl.uniform2fv(updateVelocityPrgLocs.allOldVelocities, velocitiesView);
-
-      gl.enable(gl.RASTERIZER_DISCARD);
-
-      gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, current.vtf);
-      gl.beginTransformFeedback(gl.POINTS);
-      gl.drawArrays(gl.POINTS, 0, numParticles);
-      gl.endTransformFeedback();
-      gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
+      UV_Update(gl,
+        updateVelocityProgram, updateVelocityPrgLocs,
+        minSpeed, deltaTime, numParticles, size, current);
 
       // compute the new positions
 
-      gl.useProgram(updatePositionProgram);
-      gl.bindVertexArray(current.updatePositionVA);
-      gl.uniform2f(updatePositionPrgLocs.canvasDimensions, gl.canvas.width, gl.canvas.height);
-      gl.uniform1f(updatePositionPrgLocs.deltaTime, deltaTime);
-      gl.uniform1f(updatePositionPrgLocs.margin, margin);
-
-      gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, current.ptf);
-      gl.beginTransformFeedback(gl.POINTS);
-      gl.drawArrays(gl.POINTS, 0, numParticles);
-      gl.endTransformFeedback();
-      gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
-
-      // turn on using fragment shaders again
-      gl.disable(gl.RASTERIZER_DISCARD);
+      UP_Update(gl,
+        updatePositionProgram, updatePositionPrgLocs,
+        deltaTime, margin, numParticles, current);
 
       // now draw the particles.
-      gl.useProgram(drawParticlesProgram);
-      gl.bindVertexArray(current.drawVA);
-      gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
-      gl.uniformMatrix4fv(
-        drawParticlesProgLocs.matrix,
-        false,
-        webGL.m4.orthographic(0, gl.canvas.width, 0, gl.canvas.height, -1, 1));
-      gl.uniform1f(drawParticlesProgLocs.size, size);
-      gl.drawArrays(gl.POINTS, 0, numParticles);
+
+      ID_Draw(gl, webGL,
+        drawInstancedProgram, drawInstancedProgLocs,
+        numParticles, size,
+        current.instancedDrawVA);
 
       // swap which buffer we will read from
       // and which one we will write to
