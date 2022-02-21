@@ -1,18 +1,25 @@
 import util.ColorToBooleanFunc;
+import util.MMath;
 import util.Vec2;
 
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.awt.image.BufferedImageOp;
+import java.awt.image.ConvolveOp;
+import java.awt.image.Kernel;
 import java.io.File;
 import java.io.IOException;
+import java.util.Optional;
 
 public class ForceFieldGen {
     BufferedImage original;
     BufferedImage render;
     boolean generated = false;
-    boolean useDegrees = false;
+    boolean useBlur = false;
+    float selfWeight = 1;
     float degrees = 90.0f;
+    double maxLengthDivisor = 4.0;
 
     ForceFieldGen(File in) {
         try {
@@ -22,11 +29,24 @@ public class ForceFieldGen {
         }
     }
 
-    void enableCircularLila(){
-        useDegrees = true;
+    static ForceCalculationType GetType(Color c) {
+        if (c.getBlue() > 0) {
+            return ForceCalculationType.NEAREST_ROTATED;
+        }
+        if (c.getRed() > 0) {
+            return ForceCalculationType.NEAREST_OUTER_ROTATED;
+        }
+        return ForceCalculationType.NEAREST;
     }
-    void setRotation(float deg){
-        degrees = deg;
+
+    void enableBlur() {
+        useBlur = true;
+    }
+
+    void setBlurCenterWeight(int weight) {
+        if (weight < 1)
+            throw new IllegalArgumentException();
+        selfWeight = weight;
     }
 
     void gen() {
@@ -35,71 +55,71 @@ public class ForceFieldGen {
         System.out.println("Started Image Generation");
         final long init = System.currentTimeMillis();
         long start = init;
-        ColorToBooleanFunc hitBlack = (c) -> c.getBlue() == 0;
-        ColorToBooleanFunc hitOther = (c) -> c.getBlue() > 0;
-        BufferedImage img = new BufferedImage(original.getWidth(),original.getHeight(), original.getType());
+        ColorToBooleanFunc hitBlack = (c) -> c.equals(Color.BLACK);
+        ColorToBooleanFunc hitColor = (c) -> !c.equals(Color.BLACK);
+
+        int quadSize = Math.min(original.getWidth(), original.getHeight());
+        double maxEncodedLength = ((double) quadSize) / maxLengthDivisor;
+
+        BufferedImage img = new BufferedImage(original.getWidth(), original.getHeight(), original.getType());
         for (int x = 0; x < original.getWidth(); x++) {
             for (int y = 0; y < original.getHeight(); y++) {
                 Color current = new Color(original.getRGB(x, y));
-                boolean rotate = true;
-                ColorToBooleanFunc search = hitBlack;
-                if (current.getBlue() == 0) {
-                    rotate = false;
-                    search = hitOther;
-                }
-                else if(!useDegrees) continue;
 
-                Vec2[] empty = getNearestEmpty(x, y, 5, search, original);
-                Vec2 pos = new Vec2(x, y);
-                Vec2 dir = new Vec2(0, 0);
-                for (Vec2 target : empty) {
-                    dir = dir.add(target.sub(pos).through2Length());
+                Vec2 nearest;
+                boolean rotate = false;
+                int b = 0;
+                ForceCalculationType type = GetType(current);
+                switch (type) {
+                    case NEAREST -> {
+                        nearest = getNearestCircular(x, y, hitColor);
+                    }
+                    case NEAREST_ROTATED -> {
+                        nearest = getNearestCircular(x, y, hitBlack);
+                        rotate = true;
+                        b += 128;
+                    }
+                    case NEAREST_OUTER_ROTATED -> {
+                        nearest = getNearestOuter(x, y, 30, hitBlack);
+                        rotate = true;
+                        b += 128;
+                    }
+                    default -> nearest = Vec2.Zero();
                 }
-                if(rotate)
+
+                Vec2 pos = new Vec2(x, y);
+                Vec2 dir = nearest.sub(pos);
+                if (rotate)
                     dir = dir.rotated(degrees);
-                img.setRGB(x, y, dir.toColor().getRGB());
+
+                double scaled = MMath.clamp(dir.length() / maxEncodedLength, 0.0, 1.0);
+                b += MMath.clamp((int) (scaled * 128), 0, 127);
+                img.setRGB(x, y, dir.toRGB(b));
             }
             System.out.println("Row " + x + " Completed");
         }
 
-        render = img;
-        String outPath = ".\\mediaOut\\0.png";
-        save(new File(outPath));
-        long vectorGenTime = System.currentTimeMillis();
-        System.out.println("Finished Vector Gen in " + (vectorGenTime- start) / 1000.0 + " Seconds.");
-        start = System.currentTimeMillis();
-        // Clear Empty
-        Color neutral = new Color(127, 127, 255);
-        for (int x = 0; x < img.getWidth(); x++) {
-            for (int y = 0; y < img.getHeight(); y++) {
-                Color current = new Color(img.getRGB(x, y));
-                if (current.getBlue() == 0)
-                    img.setRGB(x, y, neutral.getRGB());
-            }
+        if (useBlur) {
+            float otherWeight = 1.0f / (8f + selfWeight);
+            float centerWeight = selfWeight / (8f + selfWeight);
+            ;
+            Kernel kernel = new Kernel(3, 3, new float[]{
+                    otherWeight, otherWeight, otherWeight,
+                    otherWeight, centerWeight, otherWeight,
+                    otherWeight, otherWeight, otherWeight});
+            BufferedImageOp op = new ConvolveOp(kernel, ConvolveOp.EDGE_NO_OP, new RenderingHints(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON));
+            img = op.filter(img, null);
+
+
+            long blurTime = System.currentTimeMillis();
+            System.out.println("Blurred Image " + (blurTime - start) + " Millis.");
         }
 
-        long clearETime = System.currentTimeMillis();
-        System.out.println("Cleared Empty value in " + (clearETime - start) + " Millis.");
-        start = System.currentTimeMillis();
-
-
-        outPath = ".\\mediaOut\\1.png";
-        save(new File(outPath));
-        // Clear Blue
-        for (int x = 0; x < img.getWidth(); x++) {
-            for (int y = 0; y < img.getHeight(); y++) {
-                Color current = new Color(img.getRGB(x, y));
-                Color next = new Color(current.getRed(), current.getGreen(), 0);
-                img.setRGB(x, y, next.getRGB());
-            }
-        }
-        long clearBTime = System.currentTimeMillis();
-        System.out.println("Cleared Blue value in " + (clearBTime - start) + " Millis.");
         start = System.currentTimeMillis();
 
 
         long totalTime = System.currentTimeMillis();
-        System.out.println("Generation finished in " + (totalTime-init) / 1000.0 + " Seconds.");
+        System.out.println("Generation finished in " + (totalTime - init) / 1000.0 + " Seconds.");
 
         render = img;
         generated = true;
@@ -116,31 +136,147 @@ public class ForceFieldGen {
         }
     }
 
-    private Vec2[] getNearestEmpty(int x, int y, int searchCount, ColorToBooleanFunc func, BufferedImage img) {
-        Vec2 pos = new Vec2(x, y);
-        Vec2[] res = new Vec2[searchCount];
-        Vec2 unreachable = new Vec2(img.getWidth() * 4, img.getHeight() * 4);
-        for (int i = 0; i < searchCount; i++) {
-            res[i] = unreachable;
+    private Vec2 getNearestCircular(int x, int y, ColorToBooleanFunc func) {
+        return getNearestCircular(x, y, func, 1, Vec2.Infinity());
+    }
+
+    private Vec2 getNearestCircular(int x, int y, ColorToBooleanFunc func, int searchRange, Vec2 result) {
+        // Check if error or finished
+        if (original.getHeight() <= searchRange || original.getWidth() <= searchRange)
+            throw new IllegalStateException("No pixel found that satisfies func");
+        if (result.isFinite() && result.lengthTo(x, y) < searchRange + 1) {
+            return result;
         }
-        for (int ix = 0; ix < img.getWidth(); ix++) {
-            for (int iy = 0; iy < img.getHeight(); iy++) {
-                Color current = new Color(img.getRGB(ix, iy));
-                if (func.op(current)) {
-                    Vec2 newContender = new Vec2(ix, iy);
-                    for (int i = 0; i < searchCount; i++) {
-                        if (res[i].distanceTo(pos) > newContender.distanceTo(pos)) {
-                            for (int j = searchCount - 1; j > i; j--) {
-                                res[j] = res[j - 1];
-                            }
-                            res[i] = newContender;
-                            break;
-                        }
-                    }
+
+        int lowerX = Math.max(x - searchRange, 0);
+        int upperX = Math.min(x + searchRange, original.getWidth() - 1);
+        int lowerY = Math.max(y - searchRange, 0);
+        int upperY = Math.min(y + searchRange, original.getHeight() - 1);
+        // search pixels horizontally
+        Optional<Vec2> horizontalRes = findInRange(x, y, result, func,
+                lowerX, upperX, lowerY, upperY, true);
+        if (horizontalRes.isPresent())
+            result = horizontalRes.get();
+
+        Optional<Vec2> verticalRes = findInRange(x, y, result, func,
+                lowerX, upperX, lowerY + 1, upperY - 1, false);
+        if (verticalRes.isPresent())
+            result = verticalRes.get();
+
+        return getNearestCircular(x, y, func, searchRange + 1, result);
+    }
+
+    private Vec2 getNearestOuter(int x, int y, float fovHalf, ColorToBooleanFunc func) {
+        Vec2 dir = (new Vec2(x, y)).sub(new Vec2(original.getWidth() / 2, original.getHeight() / 2));
+        if (dir.length() < 0.0001)
+            return getNearestCircular(x, y, func, 1, Vec2.Infinity());
+        return getNearestOuter(x,y, fovHalf, func, 1, Vec2.Infinity());
+    }
+
+    private Vec2 getNearestOuter(int x, int y, float fovHalf, ColorToBooleanFunc func, int searchRange, Vec2 result) {
+        if (original.getHeight() <= searchRange || original.getWidth() <= searchRange)
+            throw new IllegalStateException("No pixel found that satisfies func");
+        if (result.isFinite() && result.lengthTo(x, y) < searchRange + 1) {
+            return result;
+        }
+
+        int lowerX = Math.max(x - searchRange, 0);
+        int upperX = Math.min(x + searchRange, original.getWidth() - 1);
+        int lowerY = Math.max(y - searchRange, 0);
+        int upperY = Math.min(y + searchRange, original.getHeight() - 1);
+        // search pixels horizontally
+        Optional<Vec2> horizontalRes = findInOuterAngle(x, y, result, func,
+                lowerX, upperX, lowerY, upperY, fovHalf, true);
+        if (horizontalRes.isPresent())
+            result = horizontalRes.get();
+
+        Optional<Vec2> verticalRes = findInOuterAngle(x, y, result, func,
+                lowerX, upperX, lowerY + 1, upperY - 1, fovHalf,false);
+        if (verticalRes.isPresent())
+            result = verticalRes.get();
+
+        return getNearestOuter(x, y, fovHalf,func,searchRange + 1, result);
+    }
+
+    private Optional<Vec2> findInRange(int x, int y,
+                                       Vec2 previousRes, ColorToBooleanFunc func,
+                                       int lowerXIn, int upperXIn,
+                                       int lowerYIn, int upperYIn,
+                                       boolean horizontally) {
+        int lowerX = Math.min(lowerXIn, upperXIn);
+        int upperX = Math.max(lowerXIn, upperXIn);
+        int lowerY = Math.min(lowerYIn, upperYIn);
+        int upperY = Math.max(lowerYIn, upperYIn);
+
+        Vec2 res = previousRes;
+        for (int i = horizontally ? lowerX : lowerY;
+             i <= (horizontally ? upperX : upperY);
+             i++) {
+            {
+                // Check lower
+                int lx = horizontally ? i : lowerX;
+                int ly = horizontally ? lowerY : i;
+                if (func.op(new Color(original.getRGB(lx, ly)))) {
+                    Vec2 newRes = new Vec2(lx, ly);
+                    if (newRes.lengthTo(x, y) < res.lengthTo(x, y))
+                        res = newRes;
+                }
+            }
+            {
+                // Check upper
+                int ux = horizontally ? i : upperX;
+                int uy = horizontally ? upperY : i;
+                if (func.op(new Color(original.getRGB(ux, uy)))) {
+                    Vec2 newRes = new Vec2(ux, uy);
+                    if (newRes.lengthTo(x, y) < res.lengthTo(x, y))
+                        res = newRes;
                 }
             }
         }
+        return res.equals(previousRes) ? Optional.empty() : Optional.of(res);
+    }
 
-        return res;
+    private Optional<Vec2> findInOuterAngle(int x, int y,
+                                            Vec2 previousRes, ColorToBooleanFunc func,
+                                            int lowerXIn, int upperXIn,
+                                            int lowerYIn, int upperYIn,
+                                            float degrees,
+                                            boolean horizontally) {
+        int lowerX = Math.min(lowerXIn, upperXIn);
+        int upperX = Math.max(lowerXIn, upperXIn);
+        int lowerY = Math.min(lowerYIn, upperYIn);
+        int upperY = Math.max(lowerYIn, upperYIn);
+        Vec2 pos = new Vec2(x,y);
+        Vec2 dir = pos.sub(new Vec2(original.getWidth()/2, original.getHeight()/2)).normalize();
+        Vec2 res = previousRes;
+        for (int i = horizontally ? lowerX : lowerY;
+             i <= (horizontally ? upperX : upperY);
+             i++) {
+            {
+                // Check lower
+                int lx = horizontally ? i : lowerX;
+                int ly = horizontally ? lowerY : i;
+                Vec2 cDir = (new Vec2(lx,ly)).sub(pos);
+                double angle = cDir.angleTo(dir);
+                if (angle <= degrees && func.op(new Color(original.getRGB(lx, ly)))) {
+                    Vec2 newRes = new Vec2(lx, ly);
+                    if (newRes.lengthTo(x, y) < res.lengthTo(x, y))
+                        res = newRes;
+                }
+            }
+            {
+                // Check upper
+                int ux = horizontally ? i : upperX;
+                int uy = horizontally ? upperY : i;
+                Vec2 cDir = (new Vec2(ux,uy)).sub(pos);
+                double angle = cDir.angleTo(dir);
+                if (angle <= degrees && func.op(new Color(original.getRGB(ux, uy)))) {
+                    Vec2 newRes = new Vec2(ux, uy);
+                    if (newRes.lengthTo(x, y) < res.lengthTo(x, y))
+                        res = newRes;
+                }
+            }
+        }
+        return res.equals(previousRes) ? Optional.empty() : Optional.of(res);
     }
 }
