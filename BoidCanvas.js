@@ -12,21 +12,14 @@ import {
   UVFT_Update,
   UVFT_VA_FB
 } from "./utils/updateVelocityForceTexture";
+import {setUpTextures} from "./utils/textureManager";
 
 const webGL = new WebGLUtil();
-
-const loadImage = (src) => new Promise(resolve => {
-  const image = new Image();
-  image.addEventListener("load", () => resolve(image));
-  image.src = src;
-});
 
 export default function Boids(texture) {
   const canvas = useRef();
   const useTexture = texture && Object.keys(texture).length !== 0;
   const imgRef = useRef();
-  let image = undefined;
-  let textureBinding = undefined;
   useEffect(() => {
     console.log("prepare rendering");
     webGL.resizeCanvasToDisplaySize(canvas.current);
@@ -147,8 +140,7 @@ export default function Boids(texture) {
       useTexture ?
         UVFT_Update(gl,
           updateVelocityProgram, updateVelocityPrgLocs,
-          minSpeed, deltaTime, numParticles, size, current,
-          textureBinding) :
+          minSpeed, deltaTime, numParticles, size, current) :
         UV_Update(gl,
           updateVelocityProgram, updateVelocityPrgLocs,
           minSpeed, deltaTime, numParticles, size, current);
@@ -173,13 +165,22 @@ export default function Boids(texture) {
         current = next;
         next = temp;
       }
-      requestAnimationFrame(render);
+
+      let waitTime = 1000 / 30 - deltaTime*1000;
+      if(1.0 < waitTime){
+        setTimeout(() => {
+          requestAnimationFrame(render);
+        }, waitTime);
+      }
+      else{
+        requestAnimationFrame(render);
+      }
     }
 
     if (useTexture) {
       const startAfterLoad = async () => {
-        image = await loadImage(imgRef.current.src);
-        textureBinding = UFVT_BindTexture(gl, updateVelocityProgram, image);
+        let image = await setUpTextures(imgRef);
+        UFVT_BindTexture(gl, updateVelocityProgram, image);
         requestAnimationFrame(render);
       };
       startAfterLoad();

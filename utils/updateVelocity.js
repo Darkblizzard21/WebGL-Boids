@@ -1,6 +1,7 @@
 import {emptyFS, updateVelocityVS} from "../data/shaderVar";
 
 // Uniforms
+const speedModifier = 1.0;
 const forceModifier = 1.0;
 const maxRotation = 360.0;
 // Avoidance Variables
@@ -13,7 +14,7 @@ const alignRange = 35.0;
 const uniteModifier = 1.0;
 const uniteRange = 20.0;
 // Wall Collision Variables
-const wallAvoidModifier = 1.4;
+const wallAvoidModifier = 1.2;
 const wallAvoidRange = 120.0;
 
 // View Variables
@@ -35,6 +36,7 @@ const UV_ProgramAndLocs = (gl, webGL) => {
       allOldVelocities: gl.getUniformLocation(updateVelocityProgram, "allOldVelocities")
     },
     general: {
+      speedModifier: gl.getUniformLocation(updateVelocityProgram, "speedModifier"),
       minSpeed: gl.getUniformLocation(updateVelocityProgram, "minSpeed"),
       size: gl.getUniformLocation(updateVelocityProgram, "size"),
       forceModifier: gl.getUniformLocation(updateVelocityProgram, "forceModifier"),
@@ -120,6 +122,7 @@ const UV_Update = (gl,
   gl.uniform2fv(updateVelocityPrgLocs.data.allOldVelocities, velocitiesView);
 
   // Set General Uniforms
+  gl.uniform1f(updateVelocityPrgLocs.general.speedModifier, speedModifier);
   gl.uniform1f(updateVelocityPrgLocs.general.minSpeed, minSpeed);
   gl.uniform1f(updateVelocityPrgLocs.general.size, size);
   gl.uniform1f(updateVelocityPrgLocs.general.forceModifier, forceModifier);

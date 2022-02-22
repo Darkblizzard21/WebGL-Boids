@@ -2,8 +2,8 @@ import java.io.File;
 
 public class main {
     public static void main(String[] args) {
-        String inPath = ".\\input\\cpp11In.png";
-        String outPath = ".\\mediaOut\\cpp21.png";
+        String inPath = ".\\input\\pp1.png";
+        String outPath = ".\\mediaOut\\pp1.png";
         ForceFieldGen ffg = new ForceFieldGen(new File(inPath));
         ffg.enableBlur();
         ffg.setBlurCenterWeight(8);

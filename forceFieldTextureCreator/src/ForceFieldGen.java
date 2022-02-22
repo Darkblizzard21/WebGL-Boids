@@ -17,6 +17,7 @@ public class ForceFieldGen {
     BufferedImage render;
     boolean generated = false;
     boolean useBlur = false;
+    boolean invertBlueRotation =false;
     float selfWeight = 1;
     float degrees = 90.0f;
     double maxLengthDivisor = 4.0;
@@ -37,6 +38,10 @@ public class ForceFieldGen {
             return ForceCalculationType.NEAREST_OUTER_ROTATED;
         }
         return ForceCalculationType.NEAREST;
+    }
+
+    void invertBlueRotation(){
+        invertBlueRotation = true;
     }
 
     void enableBlur() {
@@ -77,11 +82,13 @@ public class ForceFieldGen {
                     case NEAREST_ROTATED -> {
                         nearest = getNearestCircular(x, y, hitBlack);
                         rotate = true;
+                        degrees = invertBlueRotation ? -90 : 90;
                         b += 128;
                     }
                     case NEAREST_OUTER_ROTATED -> {
                         nearest = getNearestOuter(x, y, 30, hitBlack);
                         rotate = true;
+                        degrees = 90;
                         b += 128;
                     }
                     default -> nearest = Vec2.Zero();

@@ -23,11 +23,15 @@ void main () {
 
 
 const updateVelocityVS = `#version 300 es
+precision highp float;
+precision highp int;
+precision highp isampler2D;
 in vec2 position;
 in vec2 oldVelocity;
 in float maxSpeed;
-
+/**/
 // Data Uniforms
+uniform float speedModifier;
 uniform float deltaTime;
 uniform vec2 canvasDimensions;
 uniform vec2 allOldPositions[200];
@@ -82,13 +86,15 @@ float floatConstruct( uint m ) {
 
 float random( vec4  v ) { return floatConstruct(hash(floatBitsToUint(v))); }
 // End Noise
-vec2 inLimits(vec2 vector) {
+
+// limits.x == min, limits.y == max;
+vec2 inLimits(vec2 vector, vec2 limits) {
     float l = length(vector);
-    if (maxSpeed < l){
-        vector = normalize(vector) * maxSpeed;
+    if (limits.y < l){
+        vector = normalize(vector) * limits.y;
     }
-    if(l < minSpeed){
-        vector = normalize(vector) * minSpeed;
+    if(l < limits.x){
+        vector = normalize(vector) * limits.x;
     }
     return vector;
 }
@@ -116,17 +122,17 @@ vec2 rotate(vec2 origin, float rad){
     return vec2(x, y);
 }
 
-vec2 calcChaseForce(vec2 targetPos, float targetRange){
+vec2 calcChaseForce(vec2 targetPos, float targetRange, vec2 speed){
     vec2 diff = targetPos - position;
     float dist = length(diff);
     if (targetRange < dist){
         if (dist < 100.0){
             diff = normalize(diff);
-            float divider = maxSpeed * dist / 100.0;
+            float divider = speed.y * dist / 100.0;
             diff = diff / vec2(divider, divider);
         }
         else {
-            diff = inLimits(diff);
+            diff = inLimits(diff, speed);
         }
     }
     else
@@ -134,12 +140,13 @@ vec2 calcChaseForce(vec2 targetPos, float targetRange){
         diff = vec2(0, 0);
     }
     diff = diff - oldVelocity;
-    return inLimits(diff);
+    return inLimits(diff, speed);
 }
 
 //#textureFunctions
 
 void main() {
+    vec2 speed = vec2(minSpeed, maxSpeed) * speedModifier;
     // Avoidance Variables
     vec2 avoidSum = vec2(0, 0);
     vec2 avoidForce = vec2(0, 0);
@@ -207,30 +214,30 @@ void main() {
     if (0 < avoidCount){
         avoidSum = avoidSum / vec2(avoidCount, avoidCount);
         avoidSum = normalize(avoidSum);
-        float avoidSpeed = maxSpeed * avoidModifier;
+        float avoidSpeed = speed.y * avoidModifier;
         avoidSum = avoidSum * vec2(avoidSpeed, avoidSpeed);
         avoidSum = avoidSum - oldVelocity;
-        avoidForce = inLimits(avoidSum);
+        avoidForce = inLimits(avoidSum, speed);
     }
     // Calculate Align
     if (0 < alignCount){
         alignSum = alignSum / vec2(alignCount, alignCount);
         alignSum = normalize(alignSum);
-        float alignSpeed = maxSpeed * alignModifier;
+        float alignSpeed = speed.y * alignModifier;
         alignSum = alignSum * vec2(alignSpeed, alignSpeed);
         alignSum = alignSum - oldVelocity;
-        alignForce = inLimits(alignSum);
+        alignForce = inLimits(alignSum, speed);
     }
     // Calculate Unite
     if (0 < uniteCount){
         vec2 targetPos = uniteSum / vec2(uniteCount, uniteCount);
-        uniteForce = calcChaseForce(targetPos, avoidDesired) * uniteModifier;
+        uniteForce = calcChaseForce(targetPos, avoidDesired, speed) * uniteModifier;
     }
 
 
     // Avoid Walls
     if(distanceToCanvasX() < wallAvoidRange || distanceToCanvasY() < wallAvoidRange){
-        wallAvoidForce = calcChaseForce(canvasDimensions/2.0, avoidDesired) * wallAvoidModifier;
+        wallAvoidForce = calcChaseForce(canvasDimensions/2.0, avoidDesired , speed) * wallAvoidModifier;
     }
 
 
@@ -247,7 +254,7 @@ void main() {
         nextVelocity = rotate(nextVelocity, (luck - 0.025));
     }
 
-    newVelocity = inLimits(nextVelocity);
+    newVelocity = inLimits(nextVelocity, speed);
 
     // Smooth Rotation
     float deltaAngle = angleBetween(newVelocity, oldVelocity);

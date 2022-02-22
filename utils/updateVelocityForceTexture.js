@@ -1,11 +1,16 @@
 import {emptyFS, updateVelocityVS} from "../data/shaderVar";
+import {getTexture} from "./textureManager";
 
 // Uniforms
+const speedModifierActive = 0.7;
+let speedModifier = 1.0;
 const forceModifier = 1.0;
 const maxRotation = 360.0;
 // Avoidance Variables
-const avoidModifier = 1.2;
-const avoidDesired = 11.0;
+const avoidDefault = 1.2;
+const avoidTexture = 100.0;
+let avoidModifier = avoidDefault;
+const avoidDesired = 15.0;
 // Align Variables
 const alignModifier = 1.0;
 const alignRange = 35.0;
@@ -16,29 +21,51 @@ const uniteRange = 20.0;
 const wallAvoidModifier = 1.2;
 const wallAvoidRange = 120.0;
 // Tex Variables
-const textureForceModifierActive = 2500.0;
-const outOfTextureModifierActive = 1000.0;
-let textureForceModifier = 0.0;
-let outOfTextureModifier = 0.0;
+const outerForceModifierActive = 1200.0;
+let outerForceModifier = 0.0;
+const innerForceModifierActive = 1800.0;
+let innerForceModifier = 0.0;
+const canvasForceModifierActive = 1.0;
+let canvasForceModifier = 0.0;
 // View Variables
 const VoFhalf = 90.0;
 
-const activateTexture = () => {
-  textureForceModifier = textureForceModifierActive;
-  outOfTextureModifier = outOfTextureModifierActive;
-}
+
+// Change Texture Data
+let UV_gl = undefined;
+let UV_program = undefined;
+let targetImage = undefined;
+let texture = undefined;
+const activateTexture = (img) => {
+  if(!img){
+    img = getTexture();
+  }
+  if(targetImage !== img){
+    targetImage = img;
+    UFVT_BindTexture(UV_gl,UV_program, targetImage);
+  }
+  speedModifier = speedModifierActive;
+  outerForceModifier = outerForceModifierActive;
+  innerForceModifier = innerForceModifierActive;
+  canvasForceModifier = canvasForceModifierActive;
+  avoidModifier = avoidTexture;
+};
 
 const deactivateTexture = () => {
-  textureForceModifier = 0.0;
-  outOfTextureModifier = 0.0;
-}
+  speedModifier = 1.0;
+  outerForceModifier = 0.0;
+  innerForceModifier = 0.0;
+  canvasForceModifier = 0.0;
+  avoidModifier = avoidDefault;
+};
 
 const UVFT_ProgramAndLocs = (gl, webGL) => {
   // Modify updateVelocityVs
   const inputAdditions = `
-    uniform sampler2D uSampler;
-    uniform float textureForceModifier;
-    uniform float outOfTextureModifier;
+    uniform sampler2D sampler;
+    uniform float innerForceModifier;
+    uniform float outerForceModifier;
+    uniform float canvasForceModifier;
   `;
   const functionAdditions = ``;
   const forceCalculationAdditions = `
@@ -60,15 +87,35 @@ const UVFT_ProgramAndLocs = (gl, webGL) => {
     if(lowerEdge.x <= position.x && upperEdge.x >= position.x && lowerEdge.y <= position.y && upperEdge.y >= position.y){
       float textureSize = min(canvasDimensions.x,canvasDimensions.y);
       vec2 texCoord = (position-lowerEdge) / textureSize;
-      vec2 texVec = texture(uSampler, texCoord).xy;
-      vec2 texDir = (texVec - 0.495) * 2.0;
+      vec3 texVec = texture(sampler, texCoord).xyz;
+      
+      float forceMul = innerForceModifier;
+      /**/
+      if(texVec.z < 0.5){
+        if(0.0 < outerForceModifier)
+          speed += texVec.z * 2.0; 
+        // Out of Form
+        float range =  2.0 * texVec.z * 10.0;
+        float rangeInfluence = range * range;
+        forceMul = outerForceModifier * range;
+      }
+      else{
+        // Inform
+        float range = (texVec.z - 0.5) * 2.0 * 10.0;
+        float rangeInfluence = range * range;
+        forceMul = innerForceModifier * rangeInfluence;
+      }
+      vec2 texDir = (texVec.xy - 0.495) * 2.0;
       texDir = vec2(texDir.x,-texDir.y);
       if(length(texDir) < 0.05)
         texDir = vec2(0,0);
-      textureForce = texDir * textureForceModifier;
+      textureForce = texDir * forceMul;
     }
     else {
-        textureForce = calcChaseForce(canvasDimensions/2.0, avoidDesired) * outOfTextureModifier;
+      if(canvasForceModifier > 0.0){
+          speed = speed/ speedModifier; 
+          textureForce = normalize(canvasDimensions/2.0-position) * speed.y;
+      }
     }
     boidForces = boidForces + textureForce;
   `;
@@ -95,6 +142,7 @@ const UVFT_ProgramAndLocs = (gl, webGL) => {
       allOldVelocities: gl.getUniformLocation(updateVelocityProgram, "allOldVelocities")
     },
     general: {
+      speedModifier: gl.getUniformLocation(updateVelocityProgram, "speedModifier"),
       minSpeed: gl.getUniformLocation(updateVelocityProgram, "minSpeed"),
       size: gl.getUniformLocation(updateVelocityProgram, "size"),
       forceModifier: gl.getUniformLocation(updateVelocityProgram, "forceModifier"),
@@ -117,13 +165,16 @@ const UVFT_ProgramAndLocs = (gl, webGL) => {
       avoidModifier: gl.getUniformLocation(updateVelocityProgram, "wallAvoidModifier"),
       avoidRange: gl.getUniformLocation(updateVelocityProgram, "wallAvoidRange")
     },
-    tex:{
-      sampler: gl.getUniformLocation(updateVelocityProgram, "uSampler"),
-      forceModifier: gl.getUniformLocation(updateVelocityProgram, "textureForceModifier"),
-      outOfModifier: gl.getUniformLocation(updateVelocityProgram, "outOfTextureModifier")
+    tex: {
+      sampler: gl.getUniformLocation(updateVelocityProgram, "sampler"),
+      innerForceMod: gl.getUniformLocation(updateVelocityProgram, "innerForceModifier"),
+      outerForceMod: gl.getUniformLocation(updateVelocityProgram, "outerForceModifier"),
+      canvasForceMod: gl.getUniformLocation(updateVelocityProgram, "canvasForceModifier")
     }
   };
 
+  UV_gl = gl;
+  UV_program = updateVelocityProgram;
   return {program: updateVelocityProgram, locations: updateVelocityPrgLocs};
 };
 
@@ -163,24 +214,22 @@ const UVFT_VA_FB = (gl, webGL,
 };
 
 const textureSlot = 1;
-const UFVT_BindTexture = (gl,program,image) => {
+const UFVT_BindTexture = (gl, program, image) => {
 
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-
-  gl.uniform1i(gl.getUniformLocation(program, 'uSampler'), textureSlot);
+  gl.uniform1i(gl.getUniformLocation(program, "sampler"), textureSlot);
   gl.activeTexture(gl.TEXTURE0 + textureSlot);
 
-  const texture = gl.createTexture();
+  texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 256,256, 0, gl.RGB, gl.UNSIGNED_BYTE, image);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 256, 256, 0, gl.RGB, gl.UNSIGNED_BYTE, image);
   gl.generateMipmap(gl.TEXTURE_2D);
-
-  return texture;
-}
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+};
 
 const UVFT_Update = (gl,
                      updateVelocityProgram, updateVelocityPrgLocs,
-                     minSpeed, deltaTime, numParticles, size, current, texture) => {
+                     minSpeed, deltaTime, numParticles, size, current) => {
   // compute the new velocities
   gl.useProgram(updateVelocityProgram);
   gl.bindVertexArray(current.updateVelocityVA);
@@ -202,6 +251,7 @@ const UVFT_Update = (gl,
   gl.uniform2fv(updateVelocityPrgLocs.data.allOldVelocities, velocitiesView);
 
   // Set General Uniforms
+  gl.uniform1f(updateVelocityPrgLocs.general.speedModifier, speedModifier);
   gl.uniform1f(updateVelocityPrgLocs.general.minSpeed, minSpeed);
   gl.uniform1f(updateVelocityPrgLocs.general.size, size);
   gl.uniform1f(updateVelocityPrgLocs.general.forceModifier, forceModifier);
@@ -232,8 +282,9 @@ const UVFT_Update = (gl,
 
   // Tell the shader we bound the texture to texture unit 0
   gl.uniform1i(updateVelocityPrgLocs.tex.sampler, textureSlot);
-  gl.uniform1f(updateVelocityPrgLocs.tex.forceModifier, textureForceModifier);
-  gl.uniform1f(updateVelocityPrgLocs.tex.outOfModifier, outOfTextureModifier);
+  gl.uniform1f(updateVelocityPrgLocs.tex.outerForceMod, outerForceModifier);
+  gl.uniform1f(updateVelocityPrgLocs.tex.innerForceMod, innerForceModifier);
+  gl.uniform1f(updateVelocityPrgLocs.tex.canvasForceMod, canvasForceModifier);
 
 
   gl.enable(gl.RASTERIZER_DISCARD);
