@@ -19,7 +19,6 @@ const webGL = new WebGLUtil();
 export default function Boids(texture) {
   const canvas = useRef();
   const useTexture = texture && Object.keys(texture).length !== 0;
-  const imgRef = useRef();
   useEffect(() => {
     console.log("prepare rendering");
     webGL.resizeCanvasToDisplaySize(canvas.current);
@@ -179,8 +178,7 @@ export default function Boids(texture) {
 
     if (useTexture) {
       const startAfterLoad = async () => {
-        let image = await setUpTextures(imgRef);
-        UFVT_BindTexture(gl, updateVelocityProgram, image);
+        await setUpTextures();
         requestAnimationFrame(render);
       };
       startAfterLoad();
@@ -191,21 +189,11 @@ export default function Boids(texture) {
   }, []);
 
   return (
-    <div> {useTexture ? (<img className="hidden" src={texture} ref={imgRef}></img>) : null}
       <canvas id="WebGL"
               className="web-canvas"
               ref={canvas}
-              onMouseOver={event => {
-                if (useTexture) {
-                  activateTexture();
-                }
-              }}
-              onMouseOut={event => {
-                if (useTexture) {
-                  deactivateTexture();
-                }
-              }}>Your browser doesn't appear to support the
+              >Your browser doesn't appear to support the
         <code>&lt;canvas&gt;</code> element.
       </canvas>
-    </div>);
+    );
 }
