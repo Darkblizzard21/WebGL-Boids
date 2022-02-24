@@ -49,7 +49,7 @@ export default class WebGLUtils {
 
     // Check if the canvas is not the same size.
     const needResize =
-      canvas.width - displayWidth || canvas.height !== displayHeight;
+      canvas.width !== displayWidth || canvas.height !== displayHeight;
 
     if (needResize) {
       // Make the canvas the same size

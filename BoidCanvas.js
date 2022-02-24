@@ -14,9 +14,9 @@ import {setUpTextures} from "./utils/textureManager";
 
 const webGL = new WebGLUtil();
 
-export default function Boids(texture) {
+export default function Boids(canvasClass) {
   const canvas = useRef();
-  const useTexture = texture && Object.keys(texture).length !== 0;
+  const useTexture = canvasClass && Object.keys(canvasClass).length !== 0;
   useEffect(() => {
     console.log("prepare rendering");
     webGL.resizeCanvasToDisplaySize(canvas.current);
@@ -262,7 +262,7 @@ export default function Boids(texture) {
   }, []);
 
   return (
-    <canvas id="WebGL" className="web-canvas" ref={canvas}>
+    <canvas id="WebGL" className={useTexture ? canvasClass : "web-canvas"} ref={canvas}>
       Your browser doesn't appear to support the
       <code>&lt;canvas&gt;</code> element.
     </canvas>
