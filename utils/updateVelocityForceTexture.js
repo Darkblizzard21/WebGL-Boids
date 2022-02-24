@@ -30,19 +30,18 @@ let canvasForceModifier = 0.0;
 // View Variables
 const VoFhalf = 90.0;
 
-
 // Change Texture Data
 let UV_gl = undefined;
 let UV_program = undefined;
 let targetImage = undefined;
 let texture = undefined;
-const activateTexture = (img) => {
-  if(!img){
+const activateTexture = img => {
+  if (!img) {
     img = getTexture();
   }
-  if(targetImage !== img){
+  if (targetImage !== img) {
     targetImage = img;
-    UFVT_BindTexture(UV_gl,UV_program, targetImage);
+    UFVT_BindTexture(UV_gl, UV_program, targetImage);
   }
   speedModifier = speedModifierActive;
   outerForceModifier = outerForceModifierActive;
@@ -125,9 +124,11 @@ const UVFT_ProgramAndLocs = (gl, webGL) => {
     .replace("//#textureFunctions", functionAdditions)
     .replace("//#textureForces", forceCalculationAdditions);
 
-
   const updateVelocityProgram = webGL.createProgram(
-    gl, [injectedUpdateVelocityVS, emptyFS], ["newVelocity"]);
+    gl,
+    [injectedUpdateVelocityVS, emptyFS],
+    ["newVelocity"]
+  );
 
   console.log("use forceTexture");
 
@@ -137,15 +138,30 @@ const UVFT_ProgramAndLocs = (gl, webGL) => {
     maxSpeed: gl.getAttribLocation(updateVelocityProgram, "maxSpeed"),
     data: {
       deltaTime: gl.getUniformLocation(updateVelocityProgram, "deltaTime"),
-      canvasDimensions: gl.getUniformLocation(updateVelocityProgram, "canvasDimensions"),
-      allOldPositions: gl.getUniformLocation(updateVelocityProgram, "allOldPositions"),
-      allOldVelocities: gl.getUniformLocation(updateVelocityProgram, "allOldVelocities")
+      canvasDimensions: gl.getUniformLocation(
+        updateVelocityProgram,
+        "canvasDimensions"
+      ),
+      allOldPositions: gl.getUniformLocation(
+        updateVelocityProgram,
+        "allOldPositions"
+      ),
+      allOldVelocities: gl.getUniformLocation(
+        updateVelocityProgram,
+        "allOldVelocities"
+      )
     },
     general: {
-      speedModifier: gl.getUniformLocation(updateVelocityProgram, "speedModifier"),
+      speedModifier: gl.getUniformLocation(
+        updateVelocityProgram,
+        "speedModifier"
+      ),
       minSpeed: gl.getUniformLocation(updateVelocityProgram, "minSpeed"),
       size: gl.getUniformLocation(updateVelocityProgram, "size"),
-      forceModifier: gl.getUniformLocation(updateVelocityProgram, "forceModifier"),
+      forceModifier: gl.getUniformLocation(
+        updateVelocityProgram,
+        "forceModifier"
+      ),
       maxRotation: gl.getUniformLocation(updateVelocityProgram, "maxRotation"),
       VoFhalf: gl.getUniformLocation(updateVelocityProgram, "VoFhalf")
     },
@@ -162,14 +178,26 @@ const UVFT_ProgramAndLocs = (gl, webGL) => {
       range: gl.getUniformLocation(updateVelocityProgram, "uniteRange")
     },
     wall: {
-      avoidModifier: gl.getUniformLocation(updateVelocityProgram, "wallAvoidModifier"),
+      avoidModifier: gl.getUniformLocation(
+        updateVelocityProgram,
+        "wallAvoidModifier"
+      ),
       avoidRange: gl.getUniformLocation(updateVelocityProgram, "wallAvoidRange")
     },
     tex: {
       sampler: gl.getUniformLocation(updateVelocityProgram, "sampler"),
-      innerForceMod: gl.getUniformLocation(updateVelocityProgram, "innerForceModifier"),
-      outerForceMod: gl.getUniformLocation(updateVelocityProgram, "outerForceModifier"),
-      canvasForceMod: gl.getUniformLocation(updateVelocityProgram, "canvasForceModifier")
+      innerForceMod: gl.getUniformLocation(
+        updateVelocityProgram,
+        "innerForceModifier"
+      ),
+      outerForceMod: gl.getUniformLocation(
+        updateVelocityProgram,
+        "outerForceModifier"
+      ),
+      canvasForceMod: gl.getUniformLocation(
+        updateVelocityProgram,
+        "canvasForceModifier"
+      )
     }
   };
 
@@ -178,27 +206,51 @@ const UVFT_ProgramAndLocs = (gl, webGL) => {
   return {program: updateVelocityProgram, locations: updateVelocityPrgLocs};
 };
 
-const UVFT_VA_FB = (gl, webGL,
-                    pos1Buffer, pos2Buffer,
-                    vel1Buffer, vel2Buffer,
-                    speedBuffer,
-                    updateVelocityPrgLocs) => {
-
+const UVFT_VA_FB = (
+  gl,
+  webGL,
+  pos1Buffer,
+  pos2Buffer,
+  vel1Buffer,
+  vel2Buffer,
+  speedBuffer,
+  updateVelocityPrgLocs
+) => {
   const genVA = (posBuffer, velBuffer) => {
     const VA = gl.createVertexArray();
     gl.bindVertexArray(VA);
 
-
     gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-    gl.vertexAttribPointer(updateVelocityPrgLocs.position, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(
+      updateVelocityPrgLocs.position,
+      2,
+      gl.FLOAT,
+      false,
+      0,
+      0
+    );
     gl.enableVertexAttribArray(updateVelocityPrgLocs.position);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, velBuffer);
-    gl.vertexAttribPointer(updateVelocityPrgLocs.oldVelocity, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(
+      updateVelocityPrgLocs.oldVelocity,
+      2,
+      gl.FLOAT,
+      false,
+      0,
+      0
+    );
     gl.enableVertexAttribArray(updateVelocityPrgLocs.oldVelocity);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, speedBuffer);
-    gl.vertexAttribPointer(updateVelocityPrgLocs.maxSpeed, 1, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribPointer(
+      updateVelocityPrgLocs.maxSpeed,
+      1,
+      gl.FLOAT,
+      false,
+      0,
+      0
+    );
     gl.enableVertexAttribArray(updateVelocityPrgLocs.maxSpeed);
 
     gl.bindBuffer(gl.ARRAY_BUFFER, null);
@@ -215,28 +267,48 @@ const UVFT_VA_FB = (gl, webGL,
 
 const textureSlot = 1;
 const UFVT_BindTexture = (gl, program, image) => {
-
   gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
   gl.uniform1i(gl.getUniformLocation(program, "sampler"), textureSlot);
   gl.activeTexture(gl.TEXTURE0 + textureSlot);
 
   texture = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 256, 256, 0, gl.RGB, gl.UNSIGNED_BYTE, image);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.RGB,
+    256,
+    256,
+    0,
+    gl.RGB,
+    gl.UNSIGNED_BYTE,
+    image
+  );
   gl.generateMipmap(gl.TEXTURE_2D);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 };
 
-const UVFT_Update = (gl,
-                     updateVelocityProgram, updateVelocityPrgLocs,
-                     minSpeed, deltaTime, numParticles, size, current) => {
+const UVFT_Update = (
+  gl,
+  updateVelocityProgram,
+  updateVelocityPrgLocs,
+  minSpeed,
+  deltaTime,
+  numParticles,
+  size,
+  current
+) => {
   // compute the new velocities
   gl.useProgram(updateVelocityProgram);
   gl.bindVertexArray(current.updateVelocityVA);
 
   // Set Data Uniforms
   gl.uniform1f(updateVelocityPrgLocs.data.deltaTime, deltaTime);
-  gl.uniform2f(updateVelocityPrgLocs.data.canvasDimensions, gl.canvas.width, gl.canvas.height);
+  gl.uniform2f(
+    updateVelocityPrgLocs.data.canvasDimensions,
+    gl.canvas.width,
+    gl.canvas.height
+  );
 
   let positionsView = new Float32Array(numParticles * 2);
   gl.bindBuffer(gl.ARRAY_BUFFER, current.pReadBuffer);
@@ -286,7 +358,6 @@ const UVFT_Update = (gl,
   gl.uniform1f(updateVelocityPrgLocs.tex.innerForceMod, innerForceModifier);
   gl.uniform1f(updateVelocityPrgLocs.tex.canvasForceMod, canvasForceModifier);
 
-
   gl.enable(gl.RASTERIZER_DISCARD);
 
   gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, current.vtf);
@@ -294,7 +365,6 @@ const UVFT_Update = (gl,
   gl.drawArrays(gl.POINTS, 0, numParticles);
   gl.endTransformFeedback();
   gl.bindTransformFeedback(gl.TRANSFORM_FEEDBACK, null);
-
 
   gl.disable(gl.RASTERIZER_DISCARD);
 };

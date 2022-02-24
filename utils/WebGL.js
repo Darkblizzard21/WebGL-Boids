@@ -3,49 +3,57 @@
 
 export default class WebGLUtils {
   m4 = {
-    orthographic: function(left, right, bottom, top, near, far) {
+    orthographic: function (left, right, bottom, top, near, far) {
       return [
-        2 / (right - left), 0, 0, 0,
-        0, 2 / (top - bottom), 0, 0,
-        0, 0, 2 / (near - far), 0,
+        2 / (right - left),
+        0,
+        0,
+        0,
+        0,
+        2 / (top - bottom),
+        0,
+        0,
+        0,
+        0,
+        2 / (near - far),
+        0,
 
         (left + right) / (left - right),
         (bottom + top) / (bottom - top),
         (near + far) / (near - far),
-        1,
+        1
       ];
     },
     identity() {
       return [
-        [1,0,0,0],
-        [0,1,0,0],
-        [0,0,1,0],
-        [0,0,0,1]
+        [1, 0, 0, 0],
+        [0, 1, 0, 0],
+        [0, 0, 1, 0],
+        [0, 0, 0, 1]
       ];
     },
-    translation(x,y,z, dst) {
+    translation(x, y, z, dst) {
       return [
-        [1,0,0,x],
-        [0,1,0,y],
-        [0,0,1,z],
-        [0,0,0,1]
+        [1, 0, 0, x],
+        [0, 1, 0, y],
+        [0, 0, 1, z],
+        [0, 0, 0, 1]
       ];
     }
-  }
+  };
 
   resizeCanvasToDisplaySize(canvas) {
-
     // Lookup the size the browser is displaying the canvas in CSS pixels.
-    const displayWidth  = canvas.clientWidth;
+    const displayWidth = canvas.clientWidth;
     const displayHeight = canvas.clientHeight;
 
     // Check if the canvas is not the same size.
-    const needResize = canvas.width  - displayWidth ||
-      canvas.height !== displayHeight;
+    const needResize =
+      canvas.width - displayWidth || canvas.height !== displayHeight;
 
     if (needResize) {
       // Make the canvas the same size
-      canvas.width  = displayWidth;
+      canvas.width = displayWidth;
       canvas.height = displayHeight;
     }
 
@@ -88,7 +96,7 @@ export default class WebGLUtils {
       gl.transformFeedbackVaryings(
         program,
         transformFeedbackVaryings,
-        gl.SEPARATE_ATTRIBS,
+        gl.SEPARATE_ATTRIBS
       );
     }
     gl.linkProgram(program);
@@ -111,12 +119,12 @@ export default class WebGLUtils {
     for (const [buffer, loc] of bufLocPairs) {
       gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
       gl.vertexAttribPointer(
-        loc,      // attribute location
-        2,        // number of elements
+        loc, // attribute location
+        2, // number of elements
         gl.FLOAT, // type of data
-        false,    // normalize
-        0,        // stride (0 = auto)
-        0,        // offset
+        false, // normalize
+        0, // stride (0 = auto)
+        0 // offset
       );
       gl.enableVertexAttribArray(loc);
     }

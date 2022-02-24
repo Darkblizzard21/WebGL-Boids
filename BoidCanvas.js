@@ -6,8 +6,6 @@ import {UV_ProgramAndLocs, UV_VA_FB, UV_Update} from "./utils/updateVelocity";
 import {rand} from "./utils/utility";
 import {UP_ProgramAndLocs, UP_Update, UP_VA_FB} from "./utils/updatePosition";
 import {
-  activateTexture, deactivateTexture,
-  UFVT_BindTexture,
   UVFT_ProgramAndLocs,
   UVFT_Update,
   UVFT_VA_FB
@@ -25,9 +23,9 @@ export default function Boids(texture) {
     const gl = webGL.getGLContext(canvas.current);
 
     // Load Programs and locations
-    const updateVelocityPL = useTexture ?
-      UVFT_ProgramAndLocs(gl, webGL) :
-      UV_ProgramAndLocs(gl, webGL);
+    const updateVelocityPL = useTexture
+      ? UVFT_ProgramAndLocs(gl, webGL)
+      : UV_ProgramAndLocs(gl, webGL);
     const updateVelocityProgram = updateVelocityPL.program;
     const updateVelocityPrgLocs = updateVelocityPL.locations;
 
@@ -48,13 +46,42 @@ export default function Boids(texture) {
     const maxSpeed = useTexture ? 250 : 350;
     const spawnMargin = 0.2;
     const createPoints = (num, ranges) =>
-      new Array(num).fill(0).map(_ => ranges.map(range => rand(...range))).flat();
-    const positions = new Float32Array(createPoints(numParticles,
-      [[canvas.current.width * spawnMargin, canvas.current.width * (1 - spawnMargin)],
-        [canvas.current.height * spawnMargin, canvas.current.height * (1 - spawnMargin)]]));
-    const velocities = new Float32Array(createPoints(numParticles, useTexture ? [[0, 0.001], [0.999, 1.0]] : [[-maxSpeed, maxSpeed], [-maxSpeed, maxSpeed]], true));
-    const maxSpeeds = new Float32Array(Array(numParticles * 2).fill(0).map(_ => rand(minMaxSpeed, maxSpeed)));
-
+      new Array(num)
+        .fill(0)
+        .map(_ => ranges.map(range => rand(...range)))
+        .flat();
+    const positions = new Float32Array(
+      createPoints(numParticles, [
+        [
+          canvas.current.width * spawnMargin,
+          canvas.current.width * (1 - spawnMargin)
+        ],
+        [
+          canvas.current.height * spawnMargin,
+          canvas.current.height * (1 - spawnMargin)
+        ]
+      ])
+    );
+    const velocities = new Float32Array(
+      createPoints(
+        numParticles,
+        useTexture
+          ? [
+              [0, 0.001],
+              [0.999, 1.0]
+            ]
+          : [
+              [-maxSpeed, maxSpeed],
+              [-maxSpeed, maxSpeed]
+            ],
+        true
+      )
+    );
+    const maxSpeeds = new Float32Array(
+      Array(numParticles * 2)
+        .fill(0)
+        .map(_ => rand(minMaxSpeed, maxSpeed))
+    );
 
     // build buffers
     const position1Buffer = webGL.makeBuffer(gl, positions, gl.DYNAMIC_DRAW);
@@ -64,15 +91,27 @@ export default function Boids(texture) {
     const speedBuffer = webGL.makeBuffer(gl, maxSpeeds, gl.STATIC_DRAW);
 
     // build updateVelocity vertex arrays
-    const uvvafb = useTexture ?
-      UVFT_VA_FB(gl, webGL,
-        position1Buffer, position2Buffer,
-        velocity1Buffer, velocity2Buffer,
-        speedBuffer, updateVelocityPrgLocs) :
-      UV_VA_FB(gl, webGL,
-        position1Buffer, position2Buffer,
-        velocity1Buffer, velocity2Buffer,
-        speedBuffer, updateVelocityPrgLocs);
+    const uvvafb = useTexture
+      ? UVFT_VA_FB(
+          gl,
+          webGL,
+          position1Buffer,
+          position2Buffer,
+          velocity1Buffer,
+          velocity2Buffer,
+          speedBuffer,
+          updateVelocityPrgLocs
+        )
+      : UV_VA_FB(
+          gl,
+          webGL,
+          position1Buffer,
+          position2Buffer,
+          velocity1Buffer,
+          velocity2Buffer,
+          speedBuffer,
+          updateVelocityPrgLocs
+        );
 
     const updateVelocityVA1 = uvvafb.va1;
     const updateVelocityVA2 = uvvafb.va2;
@@ -80,10 +119,15 @@ export default function Boids(texture) {
     const velocityFB2 = uvvafb.fb2;
 
     // build updatePosition vertex arrays
-    const upvafb = UP_VA_FB(gl, webGL,
-      position1Buffer, position2Buffer,
-      velocity1Buffer, velocity2Buffer,
-      updatePositionPrgLocs);
+    const upvafb = UP_VA_FB(
+      gl,
+      webGL,
+      position1Buffer,
+      position2Buffer,
+      velocity1Buffer,
+      velocity2Buffer,
+      updatePositionPrgLocs
+    );
 
     const updatePositionVA1 = upvafb.va1;
     const updatePositionVA2 = upvafb.va2;
@@ -96,30 +140,35 @@ export default function Boids(texture) {
 
     // build instancedVa
 
-    const instancedVA = ID_VA(gl, webGL,
-      position1Buffer, position2Buffer,
-      velocity1Buffer, velocity2Buffer,
+    const instancedVA = ID_VA(
+      gl,
+      webGL,
+      position1Buffer,
+      position2Buffer,
+      velocity1Buffer,
+      velocity2Buffer,
       drawInstancedProgLocs,
       numParticles,
-      useTexture ? [.26, .66, .49] : [.26, .66, .49, 0.5, 1, 1]);
+      useTexture ? [0.26, 0.66, 0.49] : [0.26, 0.66, 0.49, 0.5, 1, 1]
+    );
 
     // set up collections
     let current = {
       vReadBuffer: velocity1Buffer,
       pReadBuffer: position1Buffer,
-      updateVelocityVA: updateVelocityVA1,  // read from velocity1
-      updatePositionVA: updatePositionVA1,  // read from position1
-      vtf: velocityFB2,                      // write to velocity2
-      ptf: positionFB2,                      // write to position2
+      updateVelocityVA: updateVelocityVA1, // read from velocity1
+      updatePositionVA: updatePositionVA1, // read from position1
+      vtf: velocityFB2, // write to velocity2
+      ptf: positionFB2, // write to position2
       instancedDrawVA: instancedVA.va2
     };
     let next = {
       vReadBuffer: velocity2Buffer,
       pReadBuffer: position2Buffer,
-      updateVelocityVA: updateVelocityVA2,  // read from velocity2
-      updatePositionVA: updatePositionVA2,  // read from position2
-      vtf: velocityFB1,                      // write to velocity1
-      ptf: positionFB1,                     // write to position1
+      updateVelocityVA: updateVelocityVA2, // read from velocity2
+      updatePositionVA: updatePositionVA2, // read from position2
+      vtf: velocityFB1, // write to velocity1
+      ptf: positionFB1, // write to position1
       instancedDrawVA: instancedVA.va1
     };
 
@@ -136,26 +185,51 @@ export default function Boids(texture) {
       webGL.resizeCanvasToDisplaySize(gl.canvas);
 
       // compute the new velocities
-      useTexture ?
-        UVFT_Update(gl,
-          updateVelocityProgram, updateVelocityPrgLocs,
-          minSpeed, deltaTime, numParticles, size, current) :
-        UV_Update(gl,
-          updateVelocityProgram, updateVelocityPrgLocs,
-          minSpeed, deltaTime, numParticles, size, current);
+      useTexture
+        ? UVFT_Update(
+            gl,
+            updateVelocityProgram,
+            updateVelocityPrgLocs,
+            minSpeed,
+            deltaTime,
+            numParticles,
+            size,
+            current
+          )
+        : UV_Update(
+            gl,
+            updateVelocityProgram,
+            updateVelocityPrgLocs,
+            minSpeed,
+            deltaTime,
+            numParticles,
+            size,
+            current
+          );
 
       // compute the new positions
 
-      UP_Update(gl,
-        updatePositionProgram, updatePositionPrgLocs,
-        deltaTime, margin, numParticles, current);
+      UP_Update(
+        gl,
+        updatePositionProgram,
+        updatePositionPrgLocs,
+        deltaTime,
+        margin,
+        numParticles,
+        current
+      );
 
       // now draw the particles.
 
-      ID_Draw(gl, webGL,
-        drawInstancedProgram, drawInstancedProgLocs,
-        numParticles, size,
-        current.instancedDrawVA);
+      ID_Draw(
+        gl,
+        webGL,
+        drawInstancedProgram,
+        drawInstancedProgLocs,
+        numParticles,
+        size,
+        current.instancedDrawVA
+      );
 
       // swap which buffer we will read from
       // and which one we will write to
@@ -165,13 +239,12 @@ export default function Boids(texture) {
         next = temp;
       }
 
-      let waitTime = 1000 / 30 - deltaTime*1000;
-      if(1.0 < waitTime){
+      let waitTime = 1000 / 30 - deltaTime * 1000;
+      if (1.0 < waitTime) {
         setTimeout(() => {
           requestAnimationFrame(render);
         }, waitTime);
-      }
-      else{
+      } else {
         requestAnimationFrame(render);
       }
     }
@@ -189,11 +262,9 @@ export default function Boids(texture) {
   }, []);
 
   return (
-      <canvas id="WebGL"
-              className="web-canvas"
-              ref={canvas}
-              >Your browser doesn't appear to support the
-        <code>&lt;canvas&gt;</code> element.
-      </canvas>
-    );
+    <canvas id="WebGL" className="web-canvas" ref={canvas}>
+      Your browser doesn't appear to support the
+      <code>&lt;canvas&gt;</code> element.
+    </canvas>
+  );
 }

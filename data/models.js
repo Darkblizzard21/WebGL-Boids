@@ -1,26 +1,17 @@
 // Define coordinates
 const triangle = {
-  model: new Float32Array([-1,-.7, 0,.8, 1,-.7]),
+  model: new Float32Array([-1, -0.7, 0, 0.8, 1, -0.7]),
   triangleCount: 1
 };
 
 const ship = {
-  model: new Float32Array([
-    -.4, -1, 0, 1, 0, -.5,
-    .4, -1, 0, 1, 0, -.5
-  ]),
+  model: new Float32Array([-0.4, -1, 0, 1, 0, -0.5, 0.4, -1, 0, 1, 0, -0.5]),
   modelAndColor: new Float32Array([
-    -.5, -1,  .26, .66, .49,
-    0, 1,     .26, .66, .49,
-    0, -.5,   .26, .66, .49,
-    .5, -1,   .26, .66, .49,
-    0, 1,     .26, .66, .49,
-    0, -.5,   .26, .66, .49,
+    -0.5, -1, 0.26, 0.66, 0.49, 0, 1, 0.26, 0.66, 0.49, 0, -0.5, 0.26, 0.66,
+    0.49, 0.5, -1, 0.26, 0.66, 0.49, 0, 1, 0.26, 0.66, 0.49, 0, -0.5, 0.26,
+    0.66, 0.49
   ]),
   triangleCount: 2
 };
 
-export {
-  triangle,
-  ship
-};
+export {triangle, ship};
