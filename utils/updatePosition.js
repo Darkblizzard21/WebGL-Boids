@@ -1,4 +1,5 @@
 import {emptyFS, updatePositionVS} from "../data/shaderVar";
+import {getCanvasScale} from "./ScaleUtility";
 
 const UP_ProgramAndLocs = (gl, webGL) => {
   const updatePositionProgram = webGL.createProgram(
@@ -80,10 +81,11 @@ const UP_Update = (
   gl.enable(gl.RASTERIZER_DISCARD);
   gl.useProgram(updatePositionProgram);
   gl.bindVertexArray(current.updatePositionVA);
+  let canvasScale = getCanvasScale();
   gl.uniform2f(
     updatePositionPrgLocs.canvasDimensions,
-    gl.canvas.width,
-    gl.canvas.height
+    gl.canvas.width * canvasScale,
+    gl.canvas.height * canvasScale
   );
   gl.uniform1f(updatePositionPrgLocs.deltaTime, deltaTime);
   gl.uniform1f(updatePositionPrgLocs.margin, margin);

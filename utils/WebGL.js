@@ -1,6 +1,8 @@
 // Based ON:
 // * https://webgl2fundamentals.org/webgl/lessons/webgl-gpgpu.html
 
+import {refreshCanvasScale} from "./ScaleUtility";
+
 export default class WebGLUtils {
   m4 = {
     orthographic: function (left, right, bottom, top, near, far) {
@@ -56,6 +58,8 @@ export default class WebGLUtils {
       canvas.width = displayWidth;
       canvas.height = displayHeight;
     }
+
+    refreshCanvasScale();
 
     return needResize;
   }

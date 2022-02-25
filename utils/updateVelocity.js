@@ -1,4 +1,5 @@
 import {emptyFS, updateVelocityVS} from "../data/shaderVar";
+import {getCanvasScale} from "./ScaleUtility";
 
 // Uniforms
 const speedModifier = 1.0;
@@ -158,11 +159,12 @@ const UV_Update = (
   gl.bindVertexArray(current.updateVelocityVA);
 
   // Set Data Uniforms
+  let canvasScale = getCanvasScale();
   gl.uniform1f(updateVelocityPrgLocs.data.deltaTime, deltaTime);
   gl.uniform2f(
     updateVelocityPrgLocs.data.canvasDimensions,
-    gl.canvas.width,
-    gl.canvas.height
+    gl.canvas.width * canvasScale,
+    gl.canvas.height * canvasScale
   );
 
   let positionsView = new Float32Array(numParticles * 2);

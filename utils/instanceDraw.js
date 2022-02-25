@@ -3,6 +3,7 @@ import {
   drawParticlesInstancedVS
 } from "../data/shaderVar";
 import {ship} from "../data/models";
+import {getCanvasScale} from "./ScaleUtility";
 
 const ID_ProgramAndLocs = (gl, webGL) => {
   const drawInstancedProgram = webGL.createProgram(gl, [
@@ -118,11 +119,12 @@ const ID_Draw = (
 
   // code above this line is initialization code.
   // code below this line is rendering code.
+  let canvasScale = getCanvasScale();
   gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
   gl.uniformMatrix4fv(
     drawInstancedProgLocs.matrix,
     false,
-    webGL.m4.orthographic(0, gl.canvas.width, 0, gl.canvas.height, -1, 1)
+    webGL.m4.orthographic(0, gl.canvas.width*canvasScale, 0, gl.canvas.height*canvasScale, -1, 1)
   );
   gl.uniform1f(drawInstancedProgLocs.scale, size);
   // draw

@@ -11,6 +11,7 @@ import {
   UVFT_VA_FB
 } from "./utils/updateVelocityForceTexture";
 import {setUpTextures} from "./utils/textureManager";
+import {getCanvasScale} from "./utils/ScaleUtility";
 
 const webGL = new WebGLUtil();
 
@@ -50,15 +51,16 @@ export default function Boids(canvasClass) {
         .fill(0)
         .map(_ => ranges.map(range => rand(...range)))
         .flat();
+    let canvasScale = getCanvasScale();
     const positions = new Float32Array(
       createPoints(numParticles, [
         [
-          canvas.current.width * spawnMargin,
-          canvas.current.width * (1 - spawnMargin)
+          canvas.current.width * canvasScale * spawnMargin,
+          canvas.current.width * canvasScale * (1 - spawnMargin)
         ],
         [
-          canvas.current.height * spawnMargin,
-          canvas.current.height * (1 - spawnMargin)
+          canvas.current.height * canvasScale * spawnMargin,
+          canvas.current.height * canvasScale * (1 - spawnMargin)
         ]
       ])
     );
