@@ -19,6 +19,7 @@ export default function Boids(canvasClass) {
   const canvas = useRef();
   const useTexture = canvasClass && Object.keys(canvasClass).length !== 0;
   useEffect(() => {
+    if(useTexture && window.screen.width<768) return;
     const frameRate =768<window.screen.width ? 30 : 24;
 
     console.log("prepare rendering");
