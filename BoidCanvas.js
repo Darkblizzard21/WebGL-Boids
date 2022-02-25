@@ -19,6 +19,8 @@ export default function Boids(canvasClass) {
   const canvas = useRef();
   const useTexture = canvasClass && Object.keys(canvasClass).length !== 0;
   useEffect(() => {
+    const frameRate =768<window.screen.width ? 30 : 24;
+
     console.log("prepare rendering");
     webGL.resizeCanvasToDisplaySize(canvas.current);
     const gl = webGL.getGLContext(canvas.current);
@@ -241,7 +243,7 @@ export default function Boids(canvasClass) {
         next = temp;
       }
 
-      let waitTime = 1000 / 30 - deltaTime * 1000;
+      let waitTime = 1000 / frameRate - deltaTime * 1000;
       if (1.0 < waitTime) {
         setTimeout(() => {
           requestAnimationFrame(render);

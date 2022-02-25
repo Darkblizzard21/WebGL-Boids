@@ -6,7 +6,7 @@ let canvasScale = normalScale;
 const getCanvasScale = () => canvasScale;
 
 const refreshCanvasScale = () => {
-  canvasScale = document.innerWidth <= mobileScreenWidth ? mobileScale : normalScale;
+  canvasScale = window.screen.width <= mobileScreenWidth ? mobileScale : normalScale;
 }
 
 export {
