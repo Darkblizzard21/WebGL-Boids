@@ -64,15 +64,6 @@ export default class WebGLUtils {
     return needResize;
   }
 
-  getGLContext(canvas, bgColor) {
-    const defaultBgColor = [1, 1, 1, 1];
-    const gl = canvas.getContext("webgl2");
-
-    gl.clearColor(...(bgColor ? bgColor : defaultBgColor));
-    gl.clear(gl.DEPTH_BUFFER_BIT | gl.COLOR_BUFFER_BIT);
-
-    return gl;
-  }
   getGLContext(canvas) {
     return canvas.getContext("webgl2");
   }

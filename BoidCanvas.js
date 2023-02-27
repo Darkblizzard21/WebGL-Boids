@@ -264,7 +264,7 @@ export default function Boids(canvasClass) {
       console.log("start rendering");
       requestAnimationFrame(render);
     }
-  }, []);
+  }, [useTexture]);
 
   return (
     <canvas id="WebGL" className={useTexture ? canvasClass : "web-canvas"} ref={canvas}>
