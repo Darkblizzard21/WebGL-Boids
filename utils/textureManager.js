@@ -8,7 +8,8 @@ const setUpTextures = async mainRef => {
     let name = skills.iconData.tooltip.name;
     let imgSrc = document.getElementById(name + "-forceTexture").src;
     skillLoaders[name] = loadImage(imgSrc);
-    return ""
+
+    return null
   });
   // Await Promise
   for (let key in skillLoaders) {
