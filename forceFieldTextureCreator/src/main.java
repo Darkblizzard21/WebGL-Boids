@@ -2,7 +2,7 @@ import java.io.File;
 
 public class main {
     public static void main(String[] args) {
-        String file = "gl-I";
+        String file = "d3d12";
         String inPath = ".\\input\\" + file + ".png";
         String outPath = ".\\mediaOut\\" + file + ".png";
         generated(inPath,outPath);
